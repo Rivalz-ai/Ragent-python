@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Union, Dict, Callable, Any
+from typing import List, Optional, Union, Dict, Callable, Any, Protocol
 from uuid import UUID
 
 #
@@ -45,6 +45,19 @@ class ModelProviderName(str, Enum):
     AKASH_CHAT_API = "akash_chat_api"
     DEEPINFRA = "deepinfra"
     SUPERPROTOCOL = "super"
+
+
+class Client(Protocol):
+    """Client interface for platform connections"""
+    enableSearch: bool = False
+
+    async def start(self, runtime: "IAgentRuntime") -> Any:
+        """Start client connection"""
+        ...
+
+    async def stop(self, runtime: "IAgentRuntime") -> Any:
+        """Stop client connection"""
+        ...
 
 class Clients(str, Enum):
     DISCORD = "discord"
@@ -414,6 +427,89 @@ class ActionResponse:
     retweet: bool
     quote: Optional[bool] = None
     reply: Optional[bool] = None
+
+
+# Add SearchResult types
+@dataclass
+class SearchResult:
+    title: str
+    url: str
+    content: str
+    score: float
+    raw_content: Optional[str] = None
+
+@dataclass
+class SearchResponse:
+    query: str
+    follow_up_questions: Optional[List[str]]
+    answer: Optional[str]
+    images: List[str] = field(default_factory=list)
+    results: List[SearchResult] = field(default_factory=list)
+    response_time: float = 0.0
+
+
+
+
+# Add Service interfaces
+class IImageDescriptionService(Service):
+    async def describeImage(self, imageUrl: str) -> Dict[str, str]:
+        """Returns {title: str, description: str}"""
+        raise NotImplementedError
+
+class ITranscriptionService(Service):
+    async def transcribe(self, audioBuffer: bytes) -> Optional[str]:
+        raise NotImplementedError
+    
+    async def transcribeLocally(self, audioBuffer: bytes) -> Optional[str]:
+        raise NotImplementedError
+
+class IVideoService(Service):
+    def isVideoUrl(self, url: str) -> bool:
+        raise NotImplementedError
+    
+    async def fetchVideoInfo(self, url: str) -> Media:
+        raise NotImplementedError
+    
+    async def downloadVideo(self, videoInfo: Media) -> str:
+        raise NotImplementedError
+
+
+
+
+
+@dataclass
+class State:
+    """State data structure for context and runtime state"""
+    userId: Optional[UUID] = None
+    agentId: Optional[UUID] = None
+    bio: str = ""
+    lore: str = ""
+    messageDirections: str = ""
+    postDirections: str = ""
+    roomId: Optional[UUID] = None
+    agentName: Optional[str] = None
+    senderName: Optional[str] = None
+    actors: str = ""
+    actorsData: Optional[List[Actor]] = None
+    goals: Optional[str] = None
+    goalsData: Optional[List[Goal]] = None
+    recentMessages: str = ""
+    recentMessagesData: List[Memory] = field(default_factory=list)
+    actionNames: Optional[str] = None 
+    actions: Optional[str] = None
+    actionsData: Optional[List[Action]] = None
+    actionExamples: Optional[str] = None
+    providers: Optional[str] = None
+    responseData: Optional[Content] = None
+    recentInteractionsData: Optional[List[Memory]] = None
+    recentInteractions: Optional[str] = None
+    formattedConversation: Optional[str] = None
+    knowledge: Optional[str] = None
+    knowledgeData: Optional[List[Any]] = None
+    extra: Dict[str, Any] = field(default_factory=dict)
+
+
+
 
 #
 # Common agent runtime interface placeholder
