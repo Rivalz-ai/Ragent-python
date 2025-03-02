@@ -8,9 +8,11 @@ from multi_agent_orchestrator.types import ConversationMessage
 from multi_agent_orchestrator.agents import AgentResponse
 import os
 from dotenv import load_dotenv
+from multi_agent_orchestrator.utils import Logger
 load_dotenv()
 
 # Initialize the orchestrator
+Logger.info("Creating classifier")
 custom_openai_classifier = OpenAIClassifier(OpenAIClassifierOptions(
     api_key=os.getenv('OPENAI_API_KEY'),
     model_id='gpt-4o',
@@ -21,7 +23,7 @@ custom_openai_classifier = OpenAIClassifier(OpenAIClassifierOptions(
                     'stopSequences': []
                 }
     ))
-
+Logger.info("Creating orchestrator")
 orchestrator = MultiAgentOrchestrator(options=OrchestratorConfig(
         LOG_AGENT_CHAT=True,
         LOG_CLASSIFIER_CHAT=True,
