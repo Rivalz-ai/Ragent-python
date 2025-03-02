@@ -90,7 +90,9 @@ class MultiAgentOrchestrator:
 
         selected_agent = classifier_result.selected_agent
         agent_chat_history = await self.storage.fetch_chat(user_id, session_id, selected_agent.id)
-
+        if selected_agent.share_global_memory:
+            agent_chat_history = await self.storage.fetch_all_chats(user_id, session_id)
+            additional_params['global_history'] = agent_chat_history
         self.logger.print_chat_history(agent_chat_history, selected_agent.id)
 
         response = await self.measure_execution_time(
@@ -135,7 +137,7 @@ class MultiAgentOrchestrator:
                                user_id: str,
                                session_id: str,
                                classifier_result: ClassifierResult,
-                               additional_params: Dict[str, str] = {}) -> AgentResponse:
+                               additional_params: Dict[str, Any] = {}) -> AgentResponse:
         """Process agent response and handle chat storage."""
         try:
             agent_response = await self.dispatch_to_agent({
@@ -182,7 +184,7 @@ class MultiAgentOrchestrator:
                        user_input: str,
                        user_id: str,
                        session_id: str, 
-                       additional_params: Dict[str, str] = {}) -> AgentResponse:
+                       additional_params: Dict[str, Any] = {}) -> AgentResponse:
         """Route user request to appropriate agent."""
         self.execution_times.clear()
 
@@ -253,7 +255,7 @@ class MultiAgentOrchestrator:
                         user_input: str,
                         user_id: str,
                         session_id: str,
-                        additional_params: Dict[str, str]) -> AgentProcessingResult:
+                        additional_params: Dict[str, Any]) -> AgentProcessingResult:
         base_metadata = AgentProcessingResult(
             user_input=user_input,
             agent_id="no_agent_selected",

@@ -34,6 +34,7 @@ class AgentOptions:
     description: str
     save_chat: bool = True
     callbacks: Optional[AgentCallbacks] = None
+    share_global_memory:Optional[bool]= False
     # Optional: Flag to enable/disable agent debug trace logging
     # If true, the agent will log additional debug information
     LOG_AGENT_DEBUG_TRACE: Optional[bool] = False
@@ -73,7 +74,7 @@ class Agent(ABC):
         user_id: str,
         session_id: str,
         chat_history: List[ConversationMessage],
-        additional_params: Optional[Dict[str, str]] = None,
+        additional_params: Optional[Dict[str, Any]] = None,
     ) -> Union[ConversationMessage, AsyncIterable[Any]]:
         pass
 
