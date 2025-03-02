@@ -11,6 +11,7 @@ class AgentProviderType(Enum):
     BEDROCK = "BEDROCK"
     ANTHROPIC = "ANTHROPIC"
     OPENAI = "OPENAI"
+    DEEPINFRA = "DEEPINFRA"
 
 
 @dataclass
@@ -45,6 +46,12 @@ class AgentToolResult:
             "name": self.func_name,
             "tool_call_id": self.tool_use_id,
             "content": self.content
+        }
+    def to_deepinfra_format(self) -> dict:
+        return {
+        "tool_call_id": self.tool_use_id,
+        "role": "tool",
+        "content": self.content,
         }
 
 class AgentTool:
@@ -193,7 +200,7 @@ class AgentTools:
     async def tool_handler(self, provider_type, response: Any, _conversation: list[dict[str, Any]]) -> Any:
 
         tool_results = []
-        if provider_type == AgentProviderType.OPENAI.value:
+        if provider_type == AgentProviderType.OPENAI.value or provider_type == AgentProviderType.DEEPINFRA.value:
             content_blocks = response
         else:
             if not response.content:
@@ -210,7 +217,7 @@ class AgentTools:
                 tool_name = tool_use_block.get("name")
             elif provider_type == AgentProviderType.ANTHROPIC.value:
                 tool_name = tool_use_block.name
-            elif provider_type == AgentProviderType.OPENAI.value:
+            elif provider_type == AgentProviderType.OPENAI.value or provider_type == AgentProviderType.DEEPINFRA.value:
                 tool_name = tool_use_block.function.name
 
 
@@ -219,7 +226,7 @@ class AgentTools:
                 tool_id = tool_use_block.get("toolUseId")
             elif provider_type == AgentProviderType.ANTHROPIC.value:
                 tool_id = tool_use_block.id
-            elif provider_type == AgentProviderType.OPENAI.value:\
+            elif provider_type == AgentProviderType.OPENAI.value or provider_type == AgentProviderType.DEEPINFRA.value :
                 tool_id = tool_use_block.id
 
    
@@ -230,7 +237,7 @@ class AgentTools:
                 input_data = tool_use_block.get("input", {})
             elif provider_type == AgentProviderType.ANTHROPIC.value:
                 input_data = tool_use_block.input
-            elif provider_type == AgentProviderType.OPENAI.value:
+            elif provider_type == AgentProviderType.OPENAI.value or provider_type == AgentProviderType.DEEPINFRA.value:
                 input_data = json.loads(tool_use_block.function.arguments)
             Logger.info(f"Processing tool '{tool_name}' with input: {input_data}")
 
@@ -248,6 +255,8 @@ class AgentTools:
                 formatted_result = tool_result.to_anthropic_format()
             elif provider_type == AgentProviderType.OPENAI.value:
                 formatted_result = tool_result.to_openai_format()
+            elif provider_type == AgentProviderType.DEEPINFRA.value:
+                formatted_result = tool_result.to_deepinfra_format()
 
             tool_results.append(formatted_result)
 
@@ -271,14 +280,13 @@ class AgentTools:
             return block["toolUse"]
         elif provider_type ==  AgentProviderType.ANTHROPIC.value and block.type == "tool_use":
             return block
-        elif provider_type ==  AgentProviderType.OPENAI.value:
+        elif provider_type ==  AgentProviderType.OPENAI.value or provider_type ==  AgentProviderType.DEEPINFRA.value:
             return block
         return None
 
     async def _process_tool(self, tool_name, input_data):
         try:
             tool = next(tool for tool in self.tools if tool.name == tool_name)
-            Logger.info(f"Found tool '{tool_name}'")
             return await tool.func(**input_data)
         except StopIteration:
             return (f"Tool '{tool_name}' not found")
@@ -292,5 +300,9 @@ class AgentTools:
         return [tool.to_bedrock_format() for tool in self.tools]
     def to_openai_format(self) -> list[dict[str, Any]]:
         """Convert all tools to OpenAI format"""
+        return [tool.to_openai_format() for tool in self.tools]
+    
+    def to_deepinfra_format(self) -> list[dict[str, Any]]:
+        """Convert all tools to Deepinfra format"""
         return [tool.to_openai_format() for tool in self.tools]
 

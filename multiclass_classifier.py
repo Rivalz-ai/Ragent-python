@@ -13,10 +13,12 @@ OPENAI_MODEL_ID_GPT_O_MINI = "gpt-4o-mini"
 class OpenAIClassifierOptions:
     def __init__(self,
                  api_key: str,
+                 base_url: Optional[str] = None,
                  model_id: Optional[str] = None,
                  inference_config: Optional[Dict[str, Any]] = None):
         self.api_key = api_key
         self.model_id = model_id
+        self.base_url = base_url
         self.inference_config = inference_config or {}
 
 class OpenAIClassifier(Classifier):
@@ -25,9 +27,13 @@ class OpenAIClassifier(Classifier):
 
         if not options.api_key:
             raise ValueError("OpenAI API key is required")
-
-        self.client = OpenAI(api_key=options.api_key)
+        if options.base_url:
+            self.client = OpenAI(api_key=options.api_key, base_url=options.base_url)
+        else:
+            self.client = OpenAI(api_key=options.api_key)
+        self.base_url = options.base_url
         self.model_id = options.model_id or OPENAI_MODEL_ID_GPT_O_MINI
+        print(f"model_id: {self.model_id}")
 
         default_max_tokens = 1000
         self.inference_config = {
@@ -42,7 +48,7 @@ class OpenAIClassifier(Classifier):
                 'type': 'function',
                 'function': {
                     'name': 'analyzePrompt',
-                    'description': 'Analyze the user input and provide structured output',
+                    'description': 'Analyze the user input, and the chat history to determine which agent to select',
                     'parameters': {
                         'type': 'object',
                         'properties': {
@@ -65,17 +71,32 @@ class OpenAIClassifier(Classifier):
             }
         ]
 
-        self.system_prompt = "You are an AI assistant."  # Add your system prompt here
+        self.system_prompt = "You are an AI assistant. Base on chat history and request of user, please select the suitable Agent for this context"  # Add your system prompt here
 
     async def process_request(self,
                             input_text: str,
                             chat_history: List[ConversationMessage]) -> ClassifierResult:
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": input_text}
-        ]
+        if chat_history:
+            messages = [
+                    {"role": "system", "content": self.system_prompt},
+                    *[{
+                        "role": msg.role.lower(),
+                        "content": msg.content[0].get('text', '') if msg.content else ''
+                    } for msg in chat_history],
+                    {"role": "user", "content": input_text}
+                ]
+        else:
+            messages = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": input_text}
+            ]
+
 
         try:
+            if self.base_url:
+                tool_choice = "auto"
+            else:
+                tool_choice = {"type": "function", "function": {"name": "analyzePrompt"}}
             response = self.client.chat.completions.create(
                 model=self.model_id,
                 messages=messages,
@@ -83,7 +104,7 @@ class OpenAIClassifier(Classifier):
                 temperature=self.inference_config['temperature'],
                 top_p=self.inference_config['top_p'],
                 tools=self.tools,
-                tool_choice={"type": "function", "function": {"name": "analyzePrompt"}}
+                tool_choice=tool_choice
             )
 
             tool_call = response.choices[0].message.tool_calls[0]

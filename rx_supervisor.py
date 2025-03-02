@@ -57,7 +57,8 @@ class RXTeamSupervisor(SupervisorAgent):
                         " - can post tweets and handle replies."
                     ),
                     api_key=self.lead_agent.api_key,  # Use same OpenAI key as lead agent
-                    model="gpt-4",
+                    model=self.lead_agent.model,  # Use same OpenAI model as lead agent
+                    base_url=self.lead_agent.base_url,  # Use same OpenAI base URL as lead agent
                     xaccesstoken=access_token,
                     inference_config={
                         'maxTokens': 500,

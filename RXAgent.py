@@ -16,6 +16,7 @@ from tools import AgentTool, AgentTools, AgentProviderType
 @dataclass
 class RXAgentOptions(AgentOptions):
     api_key: str = None
+    base_url: str = None
     model: Optional[str] = None
     streaming: Optional[bool] = None
     inference_config: Optional[Dict[str, Any]] = None
@@ -37,9 +38,12 @@ class RXAgent(Agent):
         if options.client:
             self.client = options.client
         else:
-            self.client = OpenAI(api_key=options.api_key)
+            if options.base_url:
+                self.client = OpenAI(api_key=options.api_key,base_url=options.base_url)
+            else:
+                self.client = OpenAI(api_key=options.api_key)
 
-                
+        self.base_url = options.base_url
         self.model = options.model or OPENAI_MODEL_ID_GPT_O_MINI
         self.streaming = options.streaming or False
         self.retriever: Optional[Retriever] = options.retriever
@@ -64,38 +68,44 @@ class RXAgent(Agent):
         {self.description} Provide helpful and accurate information based on your expertise.
         
         When processing requests related to social media posts:
-        - ANALYZE THE ENTIRE CONVERSATION HISTORY across all agents to understand the full context
-        - Consider previous interactions the user has had with other agents (Health, Travel, etc.)
-        - Use this comprehensive history to create more relevant and personalized content
+            1.  ANALYZE THE ENTIRE CONVERSATION HISTORY across all agents to understand the full context
+            2. Consider previous interactions the user has had with other agents (Health, Travel, etc.)
+            3. Use this comprehensive history to create more relevant and personalized content
         
         You will engage in an open-ended conversation, providing helpful and accurate information based on your expertise.
         The conversation will proceed as follows:
-        - The human may ask an initial question or provide a prompt on any topic.
-        - You will provide a relevant and informative response.
-        - The human may then follow up with additional questions or prompts related to your previous response,
+            1. The human may ask an initial question or provide a prompt on any topic.
+            2. You will provide a relevant and informative response.
+            3. The human may then follow up with additional questions or prompts related to your previous response,
           allowing for a multi-turn dialogue on that topic.
-        - Or, the human may switch to a completely new and unrelated topic at any point.
-        - You will seamlessly shift your focus to the new topic, providing thoughtful and coherent responses
+            4. Or, the human may switch to a completely new and unrelated topic at any point.
+            5. You will seamlessly shift your focus to the new topic, providing thoughtful and coherent responses
           based on your broad knowledge base.
         Throughout the conversation, you should aim to:
-        - Understand the context and intent behind each new question or prompt.
-        - Provide substantive and well-reasoned responses that directly address the query.
-        - Draw insights and connections from your extensive knowledge when appropriate.
-        - Ask for clarification if any part of the question or prompt is ambiguous.
-        - Maintain a consistent, respectful, and engaging tone tailored to the human's communication style.
-        - Seamlessly transition between topics as the human introduces new subjects.
+            1. Understand the context and intent behind each new question or prompt.
+            2. Provide substantive and well-reasoned responses that directly address the query.
+            3. Draw insights and connections from your extensive knowledge when appropriate.
+            4. Ask for clarification if any part of the question or prompt is ambiguous.
+            5. Maintain a consistent, respectful, and engaging tone tailored to the human's communication style.
+            6. Seamlessly transition between topics as the human introduces new subjects.
         
-        - After posting a tweet, (you will have a status about posting action) you must provide the details information:
-            + If the tweet is posted successfully, you should provide the link to the tweet. Else you should provide the error message.
+        After posting a tweet, (you will have a status about posting action) you must provide the details information:
+            1. If the tweet is posted successfully, PROVIDE A RESPONSE confirming the action AND LINK TO THE TWEET.
+            2. If the tweet is not posted successfully, PROVIDE A RESPONSE with the reason for the failure.
+        
         When user asks for a tweet, you should:
-        1. Base your content on the FULL CONVERSATION HISTORY across all agents
-        2. Consider both direct conversations with you and conversations with other agents
-        3. Choose the most appropriate approach:
-           - Keep original content if it's clear and effective
-           - Enhance content based on your style and expertise
-           - Ask for clarification if necessary
-        4. Use the function to post the tweet to the X account with the provided access token: {self.xaccesstoken}
-        
+            1 If user asks for a tweet, WITHOUT ANY CONTEXT, GLOBAL CONTEXT ONLY ABOUT GREETING you should **ASK** for more information.
+            2. If FULL CONVERSATION HISTORY have information for posting to tweet; Base your content on the FULL CONVERSATION HISTORY across all agents
+            3. Consider both direct conversations with you and conversations with other agents
+            4. Choose the most appropriate approach:
+                - Keep original content if it's clear and effective
+                - Enhance content based on your style and expertise
+                - Ask for clarification if necessary
+            5. Use the function to post the tweet to the X account with the provided access token: {self.xaccesstoken}
+            6. Please DO NOT PROVIDE THE ACCESS TOKEN IN THE RESPONSE
+
+        ---
+        NOTE:    
         GLOBAL CONVERSATION HISTORY IS PROVIDED SEPARATELY FROM YOUR DIRECT CONVERSATION HISTORY.
         """
 
@@ -180,15 +190,19 @@ class RXAgent(Agent):
                 final_message = ''
                 tool_use =True
                 max_recursions = self.tool_config.get('toolMaxRecursions', self.default_max_recursions)
-                
+                time_step_call = 0
                 while tool_use and max_recursions > 0:
+                    time_step_call +=1
                     if self.streaming:
-                        Logger.info(f"Handling streaming response, request_options: {request_options}")
+                        #Logger.info(f"Handling streaming response, request_options: {request_options}")
                         finish_reason, response, tool_use_blocks = await self.handle_streaming_response(request_options)
                         Logger.info(f"the response is : {finish_reason, response}")
 
                     else:
+                        print(f"Calling tool use for the {time_step_call} times")
+                        #print(f"Request options: {request_options}")
                         finish_reason, response, tool_use_blocks = await self.handle_single_response(request_options)
+                        print(f"Response: {finish_reason, response, tool_use_blocks}")
                     responses = finish_reason, response, tool_use_blocks
                     if tool_use_blocks:
                         if response:
@@ -199,7 +213,11 @@ class RXAgent(Agent):
                             tool_response = self.tool_config['useToolHandler'](responses, request_options['messages'])
                         else:
                             tools:AgentTools = self.tool_config["tool"]
-                            tool_response = await tools.tool_handler(AgentProviderType.OPENAI.value, tool_use_blocks, request_options['messages'])
+                            if self.base_url:
+                                tool_response = await tools.tool_handler(AgentProviderType.DEEPINFRA.value, tool_use_blocks, request_options['messages'])
+                            else:
+                                tool_response = await tools.tool_handler(AgentProviderType.OPENAI.value, tool_use_blocks, request_options['messages'])
+                        Logger.info(f"Tool response: {tool_response}")
                         request_options['messages'].extend(tool_response)
                         tool_use = True
                     else:

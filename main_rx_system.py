@@ -4,7 +4,7 @@ import os
 from typing import List
 from dotenv import load_dotenv
 from multi_agent_orchestrator.orchestrator import MultiAgentOrchestrator, OrchestratorConfig
-from multi_agent_orchestrator.classifiers import OpenAIClassifier, OpenAIClassifierOptions
+from multiclass_classifier import OpenAIClassifier, OpenAIClassifierOptions
 from in_memory_chat_storage import InMemoryChatStorage 
 from agents import create_health_agent, create_travel_agent,create_rx_supervisor, create_default_agent
 import uuid
@@ -17,11 +17,16 @@ from multi_agent_orchestrator.utils import Logger
 # Load environment variables from .env file
 load_dotenv()
 Logger.info("Environment variables loaded")
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+DEEP_INFRA_KEY = os.getenv("deep_infra_api_key")
+DEEP_INFRA_URL = os.getenv("base_url")
+DEEP_INFRA_MODEL= os.getenv("deep_infra_model")
 def create_classifier():
     Logger.info("Creating classifier")
     classifier = OpenAIClassifier(OpenAIClassifierOptions(
-    api_key=os.getenv('OPENAI_API_KEY'),
-    model_id='gpt-4o',
+    api_key=DEEP_INFRA_KEY,
+    model_id=DEEP_INFRA_MODEL,
+    base_url=DEEP_INFRA_URL,
     inference_config={
                     'maxTokens': 500,
                     'temperature': 0.6,
@@ -156,8 +161,10 @@ async def main(message: cl.Message):
                             msg.author = author
                             await msg.stream_token(cleaned_text)
                             await msg.update()
+                            
                         else:
                             sub_msg = cl.Message(content="", author=author)
+                            await sub_msg.send()
                             await sub_msg.stream_token(cleaned_text) # Start streaming
                             await sub_msg.update() # Finalize this message # Finalize this message
             else:
@@ -170,6 +177,7 @@ async def main(message: cl.Message):
                 msg.author = author
                 await msg.stream_token(cleaned_text)
                 await msg.update() # Finalize the message
+
     except Exception as e:
         Logger.error(f"Error processing message: {e}")
         await msg.stream_token("An error occurred while processing your request. Please try again later.")

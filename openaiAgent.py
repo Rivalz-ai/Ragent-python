@@ -16,6 +16,7 @@ from tools import AgentTool, AgentTools, AgentProviderType
 @dataclass
 class OpenAIAgentOptions(AgentOptions):
     api_key: str = None
+    base_url: str = None
     model: Optional[str] = None
     streaming: Optional[bool] = None
     inference_config: Optional[Dict[str, Any]] = None
@@ -36,9 +37,12 @@ class OpenAIAgent(Agent):
         if options.client:
             self.client = options.client
         else:
-            self.client = OpenAI(api_key=options.api_key)
+            if options.base_url:
+                self.client = OpenAI(api_key=options.api_key,base_url=options.base_url)
+            else:
+                self.client = OpenAI(api_key=options.api_key)
         self.api_key = options.api_key or ""
-                
+        self.base_url = options.base_url
         self.model = options.model or OPENAI_MODEL_ID_GPT_O_MINI
         self.streaming = options.streaming or False
         self.retriever: Optional[Retriever] = options.retriever
@@ -175,7 +179,10 @@ class OpenAIAgent(Agent):
                             tool_response = self.tool_config['useToolHandler'](responses, request_options['messages'])
                         else:
                             tools:AgentTools = self.tool_config["tool"]
-                            tool_response = await tools.tool_handler(AgentProviderType.OPENAI.value, tool_use_blocks, request_options['messages'])
+                            if self.base_url:
+                                tool_response = await tools.tool_handler(AgentProviderType.DEEPINFRA.value, tool_use_blocks, request_options['messages'])
+                            else:
+                                tool_response = await tools.tool_handler(AgentProviderType.OPENAI.value, tool_use_blocks, request_options['messages'])
                         request_options['messages'].extend(tool_response)
                         tool_use = True
                     else:
