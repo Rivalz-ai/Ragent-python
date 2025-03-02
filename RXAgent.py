@@ -11,7 +11,7 @@ from multi_agent_orchestrator.types import (
 from multi_agent_orchestrator.utils import Logger
 from multi_agent_orchestrator.retrievers import Retriever
 from tools import AgentTool, AgentTools, AgentProviderType
-
+from tweeter_tool import post_tweet, post_reply_tweet, split_post
 
 @dataclass
 class RXAgentOptions(AgentOptions):
@@ -23,8 +23,8 @@ class RXAgentOptions(AgentOptions):
     custom_system_prompt: Optional[Dict[str, Any]] = None
     retriever: Optional[Retriever] = None
     client: Optional[Any] = None
-    tool_config: Optional[Union[dict[str, Any], AgentTools]] = None
-    default_max_recursions: int = 5
+    extra_tools: Optional[Union[AgentTools, list[AgentTool]]] = None
+    default_max_recursions: int = 2
     xaccesstoken: str = None
 
 
@@ -47,7 +47,6 @@ class RXAgent(Agent):
         self.model = options.model or OPENAI_MODEL_ID_GPT_O_MINI
         self.streaming = options.streaming or False
         self.retriever: Optional[Retriever] = options.retriever
-        self.tool_config: Optional[dict[str, Any]] = options.tool_config
         self.default_max_recursions = options.default_max_recursions
         self.xaccesstoken = options.xaccesstoken
         # Default inference configuration
@@ -63,14 +62,17 @@ class RXAgent(Agent):
         else:
             self.inference_config = default_inference_config
 
+
         # Initialize system prompt
-        self.prompt_template = f"""You are a {self.name}.
-        {self.description} Provide helpful and accurate information based on your expertise.
+        self.prompt_template = f"""You are a {{name}}.
+        {{description}} Provide helpful and accurate information based on your expertise.
         
         When processing requests related to social media posts:
             1.  ANALYZE THE ENTIRE CONVERSATION HISTORY across all agents to understand the full context
             2. Consider previous interactions the user has had with other agents (Health, Travel, etc.)
             3. Use this comprehensive history to create more relevant and personalized content
+        
+        ----
         
         You will engage in an open-ended conversation, providing helpful and accurate information based on your expertise.
         The conversation will proceed as follows:
@@ -81,6 +83,9 @@ class RXAgent(Agent):
             4. Or, the human may switch to a completely new and unrelated topic at any point.
             5. You will seamlessly shift your focus to the new topic, providing thoughtful and coherent responses
           based on your broad knowledge base.
+        
+        ----
+
         Throughout the conversation, you should aim to:
             1. Understand the context and intent behind each new question or prompt.
             2. Provide substantive and well-reasoned responses that directly address the query.
@@ -89,10 +94,10 @@ class RXAgent(Agent):
             5. Maintain a consistent, respectful, and engaging tone tailored to the human's communication style.
             6. Seamlessly transition between topics as the human introduces new subjects.
         
-        After posting a tweet, (you will have a status about posting action) you must provide the details information:
-            1. If the tweet is posted successfully, PROVIDE A RESPONSE confirming the action AND LINK TO THE TWEET.
-            2. If the tweet is not posted successfully, PROVIDE A RESPONSE with the reason for the failure.
-        
+            
+        ----
+
+
         When user asks for a tweet, you should:
             1 If user asks for a tweet, WITHOUT ANY CONTEXT, GLOBAL CONTEXT ONLY ABOUT GREETING you should **ASK** for more information.
             2. If FULL CONVERSATION HISTORY have information for posting to tweet; Base your content on the FULL CONVERSATION HISTORY across all agents
@@ -101,22 +106,57 @@ class RXAgent(Agent):
                 - Keep original content if it's clear and effective
                 - Enhance content based on your style and expertise
                 - Ask for clarification if necessary
-            5. Use the function to post the tweet to the X account with the provided access token: {self.xaccesstoken}
-            6. Please DO NOT PROVIDE THE ACCESS TOKEN IN THE RESPONSE
-
+            5. Please DO NOT PROVIDE THE ACCESS TOKEN IN THE RESPONSE
+            6. If the tweet is posted successfully, PROVIDE A RESPONSE confirming the action AND LINK TO THE TWEET.
+            7. If the tweet POST FAIL, PROVIDE A RESPONSE with the ERROR AND YOUR SUGGESTION.
+        
         ---
+
         NOTE:    
         GLOBAL CONVERSATION HISTORY IS PROVIDED SEPARATELY FROM YOUR DIRECT CONVERSATION HISTORY.
         """
-
+        self._configure_tools(options.extra_tools)
         self.system_prompt = ""
-        self.custom_variables: TemplateVariables = {}
+        self.custom_variables: TemplateVariables = {
+            "name": self.name,
+            "description": self.description,
+            "xaccesstoken": self.xaccesstoken
+        }
 
         if options.custom_system_prompt:
             self.set_system_prompt(
                 options.custom_system_prompt.get('template'),
                 options.custom_system_prompt.get('variables')
             )
+
+    
+    def _configure_tools(self, extra_tools: Optional[Union[AgentTools, list[AgentTool]]]) -> None:
+        """Configure the tools available to the lead_agent."""
+                # Initialize tools
+        post_X_tool = AgentTool(
+            name="self_postx",
+            description="Post the specific content to a X account.",
+            properties = {
+                "tweet_text": {
+                    "type": "string",
+                    "description": "The content of the tweet",
+                },
+            },
+            func=self.post_to_X,
+        )
+        self.RX_tools = AgentTools(tools=[post_X_tool])
+
+        if extra_tools:
+            if isinstance(extra_tools, AgentTools):
+                self.RX_tools.tools.extend(extra_tools.tools)
+            else:
+                self.RX_tools.tools.extend(extra_tools)
+
+        if len(self.RX_tools.tools) >0:
+            self.tool_config = {
+                'tool': self.RX_tools,
+                'toolMaxRecursions': 2,
+            }
         
 
 
@@ -308,6 +348,11 @@ class RXAgent(Agent):
         self.update_system_prompt()
 
     def update_system_prompt(self) -> None:
+        self.custom_variables.update({
+        "name": self.name,
+        "description": self.description,
+        "access_token": self.xaccesstoken  # This ensures the current token is used
+        })
         all_variables: TemplateVariables = {**self.custom_variables}
         self.system_prompt = self.replace_placeholders(self.prompt_template, all_variables)
 
@@ -322,3 +367,55 @@ class RXAgent(Agent):
             return match.group(0)
 
         return re.sub(r'{{(\w+)}}', replace, template)
+    def update_access_token(self, new_token: str) -> None:
+        """
+        Updates the agent's X access token and refreshes the system prompt
+        
+        Args:
+            new_token (str): The new access token for X API
+        """
+        if not new_token:
+            Logger.warn(f"{self.name}: Attempted to update with empty token - ignoring")
+            return
+            
+        Logger.info(f"{self.name}: Updating access token")
+        
+        # Update the token
+        self.xaccesstoken = new_token
+        
+        # Update system prompt to incorporate the new token
+        self.update_system_prompt()
+        
+        Logger.info(f"{self.name}: Access token successfully updated")
+    
+    ## help function
+    def post_to_X(self,tweet_text:str) -> str:
+        """ Tweet the content text to a X account.
+        Args:
+        :param tweet_text: Content of the tweet.
+        :param access_token: Access token of the X account.
+        """
+        partTwo = None
+        if len(tweet_text) > 280:
+            post, partTwo = split_post(tweet_text)
+        else:
+            post = tweet_text
+        first_post_results = post_tweet(post, self.xaccesstoken)
+        if first_post_results.status_code != 201:
+            Logger.info("Error posting tweet: {}".format(first_post_results.text))
+            return f"Post to Twitter failed with error: {first_post_results.text} and status code: {first_post_results.status_code}"
+        
+        id = first_post_results.json()["data"]["id"]
+        Logger.info("Tweet posted with id: {}".format(id))
+        if partTwo:
+            rest_post_results = post_reply_tweet(partTwo, id, self.xaccesstoken)
+            if rest_post_results.status_code != 201:
+                Logger.info("Error posting the rest post with error: {}".format(rest_post_results.text))
+                return f""""
+                Success post apart of the tweet with id: {id}, but the rest failed to post with error: {rest_post_results.text}
+                and status code: {rest_post_results.status_code}, track the tweet at https://twitter.com/i/web/status/{id}"""
+            id2 = rest_post_results.json()["data"]["id"]
+            Logger.info(f"Tweet replied the rest posted. {id2}")
+            return f"Tweet posted with id: {id} and replied with id: {id2}, track the tweet at https://twitter.com/i/web/status/{id}"
+        return f"Tweet posted success with id: {id}, track the tweet at https://twitter.com/i/web/status/{id}"
+        # return "Tweet posted success with id: 123456789, track the tweet at https://twitter.com/i/web/status/123456789"

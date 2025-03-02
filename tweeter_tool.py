@@ -3,43 +3,62 @@ from multi_agent_orchestrator.utils import Logger
 from tools import AgentTools, AgentTool
 import requests
 def split_post(text):
-    Logger.info("Splitting post that is too long for twitter.")
-    first = text
-    second = "" # to initialize
-    # We first try to split the post by paragraphs, and send as many as can fit in the first post,
-    # and the rest in the second.
-    if "\n" in text:
-        paragraphs = text.split("\n")
-        i = 1
-        while len(first) > 280 and i < len(paragraphs):
-            first = "\n".join(paragraphs[:(len(paragraphs) - i)]) + "\n"
-            second = "\n".join(paragraphs[(len(paragraphs) - i):])
-            i += 1
-    # If post can't be split by paragraph, we try by sentence.
-    if len(first) > 280:
-        first = text
-        sentences = text.split(". ")
-        i = 1
-        while len(first) > 280 and i < len(sentences):
-            first = ". ".join(sentences[:(len(sentences) - i)]) + "."
-            second = ". ".join(sentences[(len(sentences) - i):])
-            i += 1
-    # If splitting by sentence does not result in a short enough post, we try splitting by words instead.
-    if len(first) > 280:
-        first = text
-        words = text.split(" ")
-        i = 1
-        while len(first) > 280 and i < len(words):
-            first = " ".join(words[:(len(words) - i)])
-            second = " ".join(words[(len(words) - i):])
-            i += 1
-    # If splitting has ended up with either a first or second part that is too long, we return empty
-    # strings and the post is not sent to twitter.
-    if len(first) > 280 or len(second) > 280:
-        Logger.info("Was not able to split post.", "error")
-        first = ""
-        second = ""
-    return first, second
+    """
+    Split a post that is too long for Twitter into two parts.
+    The first part will be under 277 characters (leaving room for '...').
+    
+    Args:
+        text: The text to split
+    
+    Returns:
+        tuple: (first_part, second_part) where first_part is <= 280 chars
+    """
+    Logger.info("Splitting post that is too long for Twitter.")
+    
+    # If the text is already within limits, return it as is
+    if len(text) <= 280:
+        return text, ""
+    
+    # Split the text into sentences
+    # We'll consider '.', '!', and '?' as sentence endings
+    sentence_endings = ['. ', '! ', '? ']
+    split_points = []
+    
+    for ending in sentence_endings:
+        positions = [i + len(ending) for i in range(len(text)) 
+                    if text.startswith(ending, i)]
+        split_points.extend(positions)
+    
+    # Add the position after the last character as a potential split point
+    split_points.append(len(text))
+    # Sort the split points
+    split_points.sort()
+    
+    # Find the last sentence break that keeps the first part under 277 characters
+    first_part = text
+    second_part = ""
+    
+    for pos in split_points:
+        if pos <= 277:
+            first_part = text[:pos].strip()
+            second_part = text[pos:].strip()
+        else:
+            break
+    
+    # If we couldn't find a suitable sentence break, just cut at 277 chars
+    if len(first_part) > 277:
+        first_part = text[:274].strip()  # 274 + 3 for '...' = 277
+        second_part = text[274:].strip()
+    
+    # Add '...' to the first part
+    first_part += "..."
+    
+    # If second part is still too long, set it to empty string
+    if len(second_part) > 280:
+        Logger.info("Second part is still too long, discarding it.")
+        second_part = ""
+    
+    return first_part, second_part
 
 
 def post_tweet(tweet_text, access_token):
