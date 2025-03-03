@@ -116,6 +116,10 @@ async def start():
     Logger.info(f"Created user_id: {user_id}, session_id: {session_id}")
     cl.user_session.set("chat_history", [])
 
+    rx_supervisor.force_token_refresh()
+    Logger.info("Forced token refresh for RX Supervisor on session start")
+
+    
     start_message = generate_start_message(orchestrator)
     await cl.Message(content=start_message).send()
     Logger.info("Chat session started successfully")

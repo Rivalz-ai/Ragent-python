@@ -192,3 +192,17 @@ class RXTeamSupervisor(SupervisorAgent):
         """Clean up timers when object is destroyed"""
         if self.refresh_timer:
             self.refresh_timer.cancel()
+    
+    def force_token_refresh(self) -> None:
+        """
+        Force an immediate refresh of access tokens.
+        This is useful for refreshing tokens when a new user session starts.
+        """
+        Logger.info("Forcing immediate token refresh on session start")
+        # Cancel any existing timer
+        if self.refresh_timer:
+            self.refresh_timer.cancel()
+            self.refresh_timer = None
+        
+        # Immediately refresh tokens
+        self.refresh_tokens()
