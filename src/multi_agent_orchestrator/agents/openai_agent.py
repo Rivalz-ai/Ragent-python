@@ -10,18 +10,21 @@ from multi_agent_orchestrator.types import (
 )
 from multi_agent_orchestrator.utils import Logger
 from multi_agent_orchestrator.retrievers import Retriever
-
+from tools import AgentTool, AgentTools, AgentProviderType
 
 
 @dataclass
 class OpenAIAgentOptions(AgentOptions):
     api_key: str = None
+    base_url: str = None
     model: Optional[str] = None
     streaming: Optional[bool] = None
     inference_config: Optional[Dict[str, Any]] = None
     custom_system_prompt: Optional[Dict[str, Any]] = None
     retriever: Optional[Retriever] = None
     client: Optional[Any] = None
+    tool_config: Optional[Union[dict[str, Any], AgentTools]] = None
+    default_max_recursions: int = 5
 
 
 
@@ -34,13 +37,17 @@ class OpenAIAgent(Agent):
         if options.client:
             self.client = options.client
         else:
-            self.client = OpenAI(api_key=options.api_key)
-
-                
+            if options.base_url:
+                self.client = OpenAI(api_key=options.api_key,base_url=options.base_url)
+            else:
+                self.client = OpenAI(api_key=options.api_key)
+        self.api_key = options.api_key or ""
+        self.base_url = options.base_url
         self.model = options.model or OPENAI_MODEL_ID_GPT_O_MINI
         self.streaming = options.streaming or False
         self.retriever: Optional[Retriever] = options.retriever
-
+        self.tool_config: Optional[dict[str, Any]] = options.tool_config
+        self.default_max_recursions = options.default_max_recursions
 
         # Default inference configuration
         default_inference_config = {
@@ -95,7 +102,7 @@ class OpenAIAgent(Agent):
         user_id: str,
         session_id: str,
         chat_history: List[ConversationMessage],
-        additional_params: Optional[Dict[str, str]] = None
+        additional_params: Optional[Dict[str, Any]] = None
     ) -> Union[ConversationMessage, AsyncIterable[Any]]:
         try:
 
@@ -103,11 +110,27 @@ class OpenAIAgent(Agent):
 
             system_prompt = self.system_prompt
 
+            global_history = []
+            if self.share_global_memory and additional_params and 'global_history' in additional_params:
+                global_history = additional_params['global_history']
+                Logger.info(f"Global history: {global_history}")
+    
+
+
+            #Add global history if available
+            if global_history:
+                global_context= "\n\nGLOBAL CONVERSATION CONTEXT OF USER WITH MANY AGENT:\n"
+                for i, msg in enumerate(global_history):
+                            if i >= 10:  # Limit to last 10 messages to avoid token limits
+                                break
+                            content = msg.content[0].get('text', '') if msg.content else ''
+                            global_context += f"{msg.role}: {content}\n"
+                system_prompt += global_context
+            
             if self.retriever:
                 response = await self.retriever.retrieve_and_combine_results(input_text)
                 context_prompt = "\nHere is the context to use to answer the user's question:\n" + response
                 system_prompt += context_prompt
-
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -126,13 +149,60 @@ class OpenAIAgent(Agent):
                 "temperature": self.inference_config.get('temperature'),
                 "top_p": self.inference_config.get('topP'),
                 "stop": self.inference_config.get('stopSequences'),
-                "stream": self.streaming
+                "stream": self.streaming,
+                "timeout":
             }
-            if self.streaming:
-                return await self.handle_streaming_response(request_options)
-            else:
-                return await self.handle_single_response(request_options)
 
+            # Add tools configuration if available
+            if self.tool_config:
+                tools = self.tool_config["tool"] if not isinstance(self.tool_config["tool"], AgentTools) else self.tool_config["tool"].to_openai_format()
+                request_options['tools'] = tools
+                # Handle tool calling recursively
+                final_message = ''
+                tool_use =True
+                max_recursions = self.tool_config.get('toolMaxRecursions', self.default_max_recursions)
+                
+                while tool_use and max_recursions > 0:
+                    if self.streaming:
+                        # Logger.info(f"Handling streaming response, request_options: {request_options}")
+                        finish_reason, response, tool_use_blocks = await self.handle_streaming_response(request_options)
+                        Logger.info(f"the response is : {finish_reason, response}")
+
+                    else:
+                        finish_reason, response, tool_use_blocks = await self.handle_single_response(request_options)
+                    responses = finish_reason, response, tool_use_blocks
+                    if tool_use_blocks:
+                        if response:
+                            request_options['messages'].append({"role": "assistant", "content": response})
+                        if not self.tool_config:
+                            raise ValueError("No tools available for tool use")
+                        if self.tool_config.get('useToolHandler'):
+                            tool_response = self.tool_config['useToolHandler'](responses, request_options['messages'])
+                        else:
+                            tools:AgentTools = self.tool_config["tool"]
+                            if self.base_url:
+                                tool_response = await tools.tool_handler(AgentProviderType.DEEPINFRA.value, tool_use_blocks, request_options['messages'])
+                            else:
+                                tool_response = await tools.tool_handler(AgentProviderType.OPENAI.value, tool_use_blocks, request_options['messages'])
+                        request_options['messages'].extend(tool_response)
+                        tool_use = True
+                    else:
+                        final_message = response + "\n" if response else ""
+                    if finish_reason != 'tool_calls':
+                        tool_use = False
+                    max_recursions -= 1
+
+                return ConversationMessage(role=ParticipantRole.ASSISTANT.value, content=[{"text": f"<\startagent>[{self.name}] {final_message}<\endagent>"}])
+            else:
+                if self.streaming:
+                    finish_reason, response, tool_use_blocks = await self.handle_streaming_response(request_options)
+                else:
+                    finish_reason, response, tool_use_blocks = await self.handle_single_response(request_options)
+                
+                return ConversationMessage(
+                    role = ParticipantRole.ASSISTANT.value,
+                    content=[{"text": f"<\startagent>[{self.name}] {response}<\endagent>"}]
+                )
         except Exception as error:
             Logger.error(f"Error in OpenAI API call: {str(error)}")
             raise error
@@ -146,15 +216,20 @@ class OpenAIAgent(Agent):
                 raise ValueError('No choices returned from OpenAI API')
 
             assistant_message = chat_completion.choices[0].message.content
-
-            if not isinstance(assistant_message, str):
+            tools = chat_completion.choices[0].message.tool_calls 
+            finish_reason = chat_completion.choices[0].finish_reason
+            # tool_calls = {}
+            if not isinstance(assistant_message, str) and not isinstance(tools,list):
                 raise ValueError('Unexpected response format from OpenAI API')
-
-            return ConversationMessage(
-                role=ParticipantRole.ASSISTANT.value,
-                content=[{"text": assistant_message}]
-            )
-
+     
+            # if tools is not None:
+            #     for index, tool in enumerate(tools):
+            #         tool_calls[index] = {
+            #             "index": index,
+            #             "id": tool.id,
+            #             "function":{ "name":tool.function.name, "arguments":tool.function.arguments}
+            #         }
+            return finish_reason, assistant_message, tools
         except Exception as error:
             Logger.error(f'Error in OpenAI API call: {str(error)}')
             raise error
@@ -164,19 +239,26 @@ class OpenAIAgent(Agent):
             stream = self.client.chat.completions.create(**request_options)
             accumulated_message = []
             
+            # Add agent name prefix for the first chunk
+            is_first_chunk = True
+            final_tool_calls = {}
             for chunk in stream:
                 if chunk.choices[0].delta.content:
                     chunk_content = chunk.choices[0].delta.content
+                    if is_first_chunk:
+                        chunk_content = f"""[{self.name}] {chunk_content}"""
+                        is_first_chunk = False
                     accumulated_message.append(chunk_content)
                     if self.callbacks:
                         self.callbacks.on_llm_new_token(chunk_content)
-                    #yield chunk_content
-
-            # Store the complete message in the instance for later access if needed
-            return ConversationMessage(
-                role=ParticipantRole.ASSISTANT.value,
-                content=[{"text": ''.join(accumulated_message)}]
-            )
+                if chunk.choices[0].delta.tool_calls:
+                    for tool_call in chunk.choices[0].delta.tool_calls or []:
+                        index = tool_call.index
+                        if index not in final_tool_calls:
+                            final_tool_calls[index] = tool_call
+                        final_tool_calls[index].function.arguments += tool_call.function.arguments
+            finish_reason = chunk.choices[0].finish_reason        
+            return finish_reason, ''.join(accumulated_message) +"\n" if len(accumulated_message)>0 else None, list(final_tool_calls.values()) if len(final_tool_calls)>0 else None
 
         except Exception as error:
             Logger.error(f"Error getting stream from OpenAI model: {str(error)}")

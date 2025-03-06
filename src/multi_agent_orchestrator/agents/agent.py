@@ -54,6 +54,7 @@ class Agent(ABC):
             if options.LOG_AGENT_DEBUG_TRACE is not None
             else False
         )
+        self.share_global_memory = options.share_global_memory or False
 
     def is_streaming_enabled(self) -> bool:
         return False
