@@ -150,7 +150,7 @@ class OpenAIAgent(Agent):
                 "top_p": self.inference_config.get('topP'),
                 "stop": self.inference_config.get('stopSequences'),
                 "stream": self.streaming,
-                "timeout":
+                "timeout": 30,
             }
 
             # Add tools configuration if available
