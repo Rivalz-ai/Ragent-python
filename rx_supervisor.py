@@ -146,6 +146,11 @@ class RXTeamSupervisor(SupervisorAgent):
                             Logger.warn(f"No access token found for RX_Agent_{idx + 1} during refresh")
                     self.team = self.team[:len(access_tokens)]
                 else:
+                    for idx, agent in enumerate(self.team):
+                        if idx < len(access_tokens):
+                            agent.update_access_token(access_tokens[idx])
+                        else:
+                            break
                     Logger.warn("More access tokens found than existing agents")
                     # adding new agents
                     for idx in range(len(self.team), len(access_tokens)):

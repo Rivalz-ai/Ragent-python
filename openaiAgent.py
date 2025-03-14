@@ -149,7 +149,8 @@ class OpenAIAgent(Agent):
                 "temperature": self.inference_config.get('temperature'),
                 "top_p": self.inference_config.get('topP'),
                 "stop": self.inference_config.get('stopSequences'),
-                "stream": self.streaming
+                "stream": self.streaming,
+                "timeout":50
             }
 
             # Add tools configuration if available
@@ -162,6 +163,7 @@ class OpenAIAgent(Agent):
                 max_recursions = self.tool_config.get('toolMaxRecursions', self.default_max_recursions)
                 
                 while tool_use and max_recursions > 0:
+                    Logger.info(f"request_options['messages']: {request_options['messages']}")
                     if self.streaming:
                         # Logger.info(f"Handling streaming response, request_options: {request_options}")
                         finish_reason, response, tool_use_blocks = await self.handle_streaming_response(request_options)

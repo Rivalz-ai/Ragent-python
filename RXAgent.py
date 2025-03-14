@@ -240,7 +240,7 @@ class RXAgent(Agent):
 
                     else:
                         print(f"Calling tool use for the {time_step_call} times")
-                        #print(f"Request options: {request_options}")
+                        print(f"Request options: {request_options['messages']}")
                         finish_reason, response, tool_use_blocks = await self.handle_single_response(request_options)
                         print(f"Response: {finish_reason, response, tool_use_blocks}")
                     responses = finish_reason, response, tool_use_blocks
@@ -367,6 +367,7 @@ class RXAgent(Agent):
             return match.group(0)
 
         return re.sub(r'{{(\w+)}}', replace, template)
+    
     def update_access_token(self, new_token: str) -> None:
         """
         Updates the agent's X access token and refreshes the system prompt
