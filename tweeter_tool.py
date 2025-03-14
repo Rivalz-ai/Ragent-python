@@ -1,5 +1,5 @@
 # Function for splitting up posts that are too long for twitter.
-from multi_agent_orchestrator.utils import Logger
+from rAgent.utils import Logger
 from tools import AgentTools, AgentTool
 import requests
 def split_post(text):

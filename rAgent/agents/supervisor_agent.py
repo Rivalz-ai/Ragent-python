@@ -1,17 +1,15 @@
 from typing import Optional, Any, AsyncIterable, Union, TYPE_CHECKING
 from dataclasses import dataclass, field
 import asyncio
-from multi_agent_orchestrator.agents import Agent, AgentOptions
+import random
+from rAgent.agents import Agent, AgentOptions
 if TYPE_CHECKING:
-    from multi_agent_orchestrator.agents import AnthropicAgent, BedrockLLMAgent
+    from rAgent.agents import AnthropicAgent, BedrockLLMAgent
     from openaiAgent import OpenAIAgent
 
-from multi_agent_orchestrator.types import ConversationMessage, ParticipantRole, TimestampedMessage
-from multi_agent_orchestrator.utils import Logger
-from tools import AgentTools, AgentTool
-from typing import Optional, Union
-from multi_agent_orchestrator.storage import ChatStorage, InMemoryChatStorage
-
+from rAgent.types import ConversationMessage, ParticipantRole, TimestampedMessage
+from rAgent.utils import Logger, AgentTools, AgentTool
+from rAgent.storage import ChatStorage, InMemoryChatStorage
 
 @dataclass
 class SupervisorAgentOptions(AgentOptions):
@@ -20,18 +18,19 @@ class SupervisorAgentOptions(AgentOptions):
     storage: Optional[ChatStorage] = None # memory storage for the team
     trace: Optional[bool] = None # enable tracing/logging
     extra_tools: Optional[Union[AgentTools, list[AgentTool]]] = None # add extra tools to the lead_agent
+    type: str = "default"  # routing type: default, broadcast, random
 
     def validate(self) -> None:
         # Get the actual class names as strings for comparison
         valid_agent_types = []
         try:
-            from multi_agent_orchestrator.agents import BedrockLLMAgent
+            from rAgent.agents import BedrockLLMAgent
             valid_agent_types.append(BedrockLLMAgent)
         except ImportError:
             pass
 
         try:
-            from multi_agent_orchestrator.agents import AnthropicAgent
+            from rAgent.agents import AnthropicAgent
             valid_agent_types.append(AnthropicAgent)
         except ImportError:
             pass
@@ -41,7 +40,6 @@ class SupervisorAgentOptions(AgentOptions):
             valid_agent_types.append(OpenAIAgent)
         except ImportError:
             pass
-
 
         if not valid_agent_types:
             raise ImportError("No agents available. Please install at least one agent: AnthropicAgent or BedrockLLMAgent")
@@ -86,39 +84,92 @@ class SupervisorAgent(Agent):
         self.user_id = ''
         self.session_id = ''
         self.additional_params = None
+        self.type = options.type
 
         self._configure_supervisor_tools(options.extra_tools)
         self._configure_prompt()
 
     def _configure_supervisor_tools(self, extra_tools: Optional[Union[AgentTools, list[AgentTool]]]) -> None:
         """Configure the tools available to the lead_agent."""
-        self.supervisor_tools = AgentTools([AgentTool(
-            name='send_messages',
-            description='Send messages to multiple agents in parallel.',
-            properties={
-                "messages": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "recipient": {
-                                "type": "string",
-                                "description": "Agent name to send message to."
+        if self.type == "default":
+            if type(self.lead_agent).__name__ == "OpenAIAgent":
+                self.supervisor_tools = AgentTools([AgentTool(
+                    name='send_messages',
+                    strict=False,
+                    description='Send messages to multiple agents in parallel.',
+                    properties={
+                        "messages": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "recipient": {
+                                        "type": "string",
+                                        "description": "Agent name to send message to."
+                                    },
+                                    "content": {
+                                        "type": "string",
+                                        "description": "Message content."
+                                    }
+                                },
+                                "required": ["recipient", "content"]
                             },
-                            "content": {
-                                "type": "string",
-                                "description": "Message content."
-                            }
-                        },
-                        "required": ["recipient", "content"]
+                            "description": "Array of messages for different agents.",
+
+                        }
                     },
-                    "description": "Array of messages for different agents.",
-                    "minItems": 1
-                }
-            },
-            required=["messages"],
-            func=self.send_messages
-        )])
+                    required=["messages"],
+                    func=self.send_messages
+                )])
+            else:
+                self.supervisor_tools = AgentTools([AgentTool(
+                    name='send_messages',
+                    description='Send messages to multiple agents in parallel.',
+                    properties={
+                        "messages": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "recipient": {
+                                        "type": "string",
+                                        "description": "Agent name to send message to."
+                                    },
+                                    "content": {
+                                        "type": "string",
+                                        "description": "Message content."
+                                    }
+                                },
+                                "required": ["recipient", "content"]
+                            },
+                            "description": "Array of messages for different agents.",
+                            "minItems": 1
+                        }
+                    },
+                    required=["messages"],
+                    func=self.send_messages
+                )])
+        elif self.type == "selection":
+            self.supervisor_tools = AgentTools([AgentTool(
+                name='selection_messages',
+                strict=False,
+                description='Decide number of agents is used to send message then send message from user to it!',
+                properties={
+                    "num_agents": {
+                        "type": "number",
+                        "description": "Number of agents to randomly select."
+                        },
+                    "content": {
+                        "type": "string",
+                        "description": "The content users send to Agents."
+                    }
+                },
+                required=["num_agents", "content"],
+                func=self.select_agent
+            )])
+        else:
+            self.supervisor_tools= AgentTools([])
+
 
         if extra_tools:
             if isinstance(extra_tools, AgentTools):
@@ -126,15 +177,20 @@ class SupervisorAgent(Agent):
             else:
                 self.supervisor_tools.tools.extend(extra_tools)
 
-        self.lead_agent.tool_config = {
-            'tool': self.supervisor_tools,
-            'toolMaxRecursions': self.DEFAULT_TOOL_MAX_RECURSIONS,
-        }
+        if len(self.supervisor_tools.tools) >0:
+            self.lead_agent.tool_config = {
+                'tool': self.supervisor_tools,
+                'toolMaxRecursions': self.DEFAULT_TOOL_MAX_RECURSIONS,
+            }
 
     def _configure_prompt(self) -> None:
         """Configure the lead_agent's prompt template."""
-        tools_str = "\n".join(f"{tool.name}:{tool.func_description}"
+        if len(self.supervisor_tools.tools)>0:
+            tools_str = "\n".join(f"{tool.name}:{tool.func_description}"
                             for tool in self.supervisor_tools.tools)
+        else:
+            tools_str = "No tools available."
+            
         agent_list_str = "\n".join(f"{agent.name}: {agent.description}"
                                   for agent in self.team)
 
@@ -155,6 +211,7 @@ Here are the tools you can use:
 When communicating with other agents, including the User, please follow these guidelines:
 <guidelines>
 - Provide a final answer to the User when you have a response from all agents.
+- If user ask to format the responses from agents, format the responses then answer the user.
 - Do not mention the name of any agent in your response.
 - Make sure that you optimize your communication by contacting MULTIPLE agents at the same time whenever possible.
 - Keep your communications with other agents concise and terse, do not engage in any chit-chat.
@@ -222,7 +279,7 @@ When communicating with other agents, including the User, please follow these gu
                     f"\033[33m\n<<<<<===Supervisor received from {agent.name}:\n{response.content[0].get('text','')[:500]}...\033[0m"
                 )
 
-            return f"{agent.name}: {response.content[0].get('text', '')}"
+            return f"{response.content[0].get('text', '')}"
 
         except Exception as e:
             Logger.error(f"Error in send_message: {e}")
@@ -257,6 +314,62 @@ When communicating with other agents, including the User, please follow these gu
             Logger.error(f"Error in send_messages: {e}")
             raise e
 
+    async def broadcast_messages(self, content: str) -> str:
+        """Broadcast a message to all agents in parallel."""
+        try:
+            tasks = [
+                asyncio.create_task(
+                    asyncio.to_thread(
+                        self.send_message,
+                        agent,
+                        content,
+                        self.user_id,
+                        self.session_id,
+                        self.additional_params
+                    )
+                )
+                for agent in self.team
+            ]
+
+            if not tasks:
+                return ''
+
+            responses = await asyncio.gather(*tasks)
+            return '\n'.join(responses)
+
+        except Exception as e:
+            Logger.error(f"Error in broadcast_messages: {e}")
+            raise e
+
+    async def select_agent(self, num_agents:int, content: str) -> str:
+        """Send messages to a random selection of agents."""
+        try:
+            tasks = []
+            selected_agents = random.sample(self.team, min(num_agents, len(self.team)))
+            for agent in selected_agents:
+                tasks.append(
+                    asyncio.create_task(
+                        asyncio.to_thread(
+                            self.send_message,
+                            agent,
+                            content,
+                            self.user_id,
+                            self.session_id,
+                            self.additional_params
+                        )
+                    )
+                )
+
+            if not tasks:
+                return ''
+
+            responses = await asyncio.gather(*tasks)
+            return ''.join(responses)
+
+        except Exception as e:
+            Logger.error(f"Error in random_messages: {e}")
+            raise e
+
     def _format_agents_memory(self, agents_history: list[ConversationMessage]) -> str:
         """Format agent conversation history."""
         return ''.join(
@@ -272,24 +385,41 @@ When communicating with other agents, including the User, please follow these gu
         user_id: str,
         session_id: str,
         chat_history: list[ConversationMessage],
-        additional_params: Optional[dict[str, str]] = None
+        additional_params: Optional[dict[str, Any]] = None
     ) -> Union[ConversationMessage, AsyncIterable[Any]]:
         """Process a user request through the lead_agent agent."""
         try:
             self.user_id = user_id
             self.session_id = session_id
             self.additional_params = additional_params
-
+            print(self.additional_params)
             agents_history = await self.storage.fetch_all_chats(user_id, session_id)
             agents_memory = self._format_agents_memory(agents_history)
 
             self.lead_agent.set_system_prompt(
                 self.prompt_template.replace('{AGENTS_MEMORY}', agents_memory)
             )
-
-            return await self.lead_agent.process_request(
-                input_text, user_id, session_id, chat_history, additional_params
-            )
+            if self.type == "default":
+                return await self.lead_agent.process_request(
+                    input_text, user_id, session_id, chat_history, additional_params
+                )
+            elif self.type == "selection":
+                return await self.lead_agent.process_request(
+                    input_text, user_id, session_id, chat_history, additional_params
+                )
+            
+            elif self.type == "broadcast":
+                responses_from_agents =  await self.broadcast_messages(input_text)
+                new_input = f"Here is the total respones from memeber Agents: {responses_from_agents}, Summarize the answers of member Agents and respond to users in a unified manner"
+                conversations = await self.lead_agent.process_request(
+                    new_input, user_id, session_id, chat_history, additional_params
+                )
+                return ConversationMessage(
+                    role = conversations.role,
+                    content=[{"text": responses_from_agents+"\n" + conversations.content[0].get('text', '')}]
+                )
+            
+            return "There is no answer for this requests because lead Agent can't not handle it!"
 
         except Exception as e:
             Logger.error(f"Error in process_request: {e}")

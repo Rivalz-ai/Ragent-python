@@ -3,17 +3,17 @@ import chainlit as cl
 import os
 from typing import List
 from dotenv import load_dotenv
-from multi_agent_orchestrator.orchestrator import MultiAgentOrchestrator, OrchestratorConfig
-from multiclass_classifier import OpenAIClassifier, OpenAIClassifierOptions
-from in_memory_chat_storage import InMemoryChatStorage 
+from rAgent.orchestrator import SwarmOrchestrator, OrchestratorConfig
+from rAgent.classifiers import OpenAIClassifier, OpenAIClassifierOptions
+from rAgent.storage import InMemoryChatStorage 
 from agents import create_health_agent, create_travel_agent,create_rx_supervisor, create_default_agent
 import uuid
 import re
-from multi_agent_orchestrator.types import ConversationMessage
+from rAgent.types import ConversationMessage
 import asyncio
-from multi_agent_orchestrator.agents import AgentResponse
-from supervisor_agent1 import SupervisorAgent
-from multi_agent_orchestrator.utils import Logger
+from rAgent.agents import AgentResponse
+from rAgent.agents import SupervisorAgent
+from rAgent.utils import Logger
 # Load environment variables from .env file
 load_dotenv()
 Logger.info("Environment variables loaded")
@@ -47,12 +47,12 @@ travel_agent = create_travel_agent()
 
 default_agent = create_default_agent()
 # Create RX Team Supervisor
-rx_supervisor = create_rx_supervisor(storage = shared_storage)
+rx_supervisor = create_rx_supervisor(storage = shared_storage, num_agents=3)
 Logger.info("All agents created successfully")
 
 # Initialize orchestrator
 Logger.info("Initializing orchestrator")
-orchestrator = MultiAgentOrchestrator(options=OrchestratorConfig(
+orchestrator = SwarmOrchestrator(options=OrchestratorConfig(
         LOG_AGENT_CHAT=True,
         LOG_CLASSIFIER_CHAT=True,
         LOG_CLASSIFIER_RAW_OUTPUT=True,
@@ -73,7 +73,7 @@ orchestrator.add_agent(health_agent)
 orchestrator.add_agent(travel_agent)
 Logger.info("Agents added to orchestrator")
 
-def generate_start_message(orchestrator: MultiAgentOrchestrator) -> str:
+def generate_start_message(orchestrator: SwarmOrchestrator) -> str:
     message = "You are interacting with the following agents:\n"
     for agent_id in orchestrator.agents:
         agent = orchestrator.agents[agent_id]

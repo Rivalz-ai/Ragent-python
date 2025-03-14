@@ -2,8 +2,8 @@ from typing import Optional, Union
 import time
 from collections import defaultdict
 from chat_storage import ChatStorage
-from multi_agent_orchestrator.types import ConversationMessage, TimestampedMessage
-from multi_agent_orchestrator.utils import Logger
+from rAgent.types import ConversationMessage, TimestampedMessage
+from rAgent.utils import Logger
 
 class InMemoryChatStorage(ChatStorage):
     def __init__(self):

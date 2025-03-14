@@ -1,14 +1,13 @@
 import uuid
 import chainlit as cl
 from agents import create_tech_agent, create_travel_agent, create_health_agent,create_X_agent
-from multi_agent_orchestrator.orchestrator import MultiAgentOrchestrator, OrchestratorConfig
-from multi_agent_orchestrator.classifiers import BedrockClassifier, BedrockClassifierOptions
-from multi_agent_orchestrator.classifiers import OpenAIClassifier, OpenAIClassifierOptions
-from multi_agent_orchestrator.types import ConversationMessage
-from multi_agent_orchestrator.agents import AgentResponse
+from rAgent.orchestrator import SwarmOrchestrator, OrchestratorConfig
+from rAgent.classifiers import OpenAIClassifier, OpenAIClassifierOptions
+from rAgent.types import ConversationMessage
+from rAgent.agents import AgentResponse
 import os
 from dotenv import load_dotenv
-from multi_agent_orchestrator.utils import Logger
+from rAgent.utils import Logger
 load_dotenv()
 
 # Initialize the orchestrator
@@ -24,7 +23,7 @@ custom_openai_classifier = OpenAIClassifier(OpenAIClassifierOptions(
                 }
     ))
 Logger.info("Creating orchestrator")
-orchestrator = MultiAgentOrchestrator(options=OrchestratorConfig(
+orchestrator = SwarmOrchestrator(options=OrchestratorConfig(
         LOG_AGENT_CHAT=True,
         LOG_CLASSIFIER_CHAT=True,
         LOG_CLASSIFIER_RAW_OUTPUT=True,

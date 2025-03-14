@@ -1,15 +1,15 @@
 from typing import Dict, List, Union, AsyncIterable, Optional, Any
 from dataclasses import dataclass
 from openai import OpenAI
-from multi_agent_orchestrator.agents import Agent, AgentOptions
-from multi_agent_orchestrator.types import (
+from rAgent.agents import Agent, AgentOptions
+from rAgent.types import (
     ConversationMessage,
     ParticipantRole,
     OPENAI_MODEL_ID_GPT_O_MINI,
     TemplateVariables
 )
-from multi_agent_orchestrator.utils import Logger
-from multi_agent_orchestrator.retrievers import Retriever
+from rAgent.utils import Logger
+from rAgent.retrievers import Retriever
 from tools import AgentTool, AgentTools, AgentProviderType
 from tweeter_tool import post_tweet, post_reply_tweet, split_post
 
@@ -237,12 +237,10 @@ class RXAgent(Agent):
                         #Logger.info(f"Handling streaming response, request_options: {request_options}")
                         finish_reason, response, tool_use_blocks = await self.handle_streaming_response(request_options)
                         Logger.info(f"the response is : {finish_reason, response}")
-
                     else:
-                        print(f"Calling tool use for the {time_step_call} times")
-                        print(f"Request options: {request_options['messages']}")
+                        Logger.info(f"Calling tool use for the {time_step_call} times")
                         finish_reason, response, tool_use_blocks = await self.handle_single_response(request_options)
-                        print(f"Response: {finish_reason, response, tool_use_blocks}")
+                        Logger.info(f"Response: {finish_reason, response, tool_use_blocks}")
                     responses = finish_reason, response, tool_use_blocks
                     if tool_use_blocks:
                         if response:

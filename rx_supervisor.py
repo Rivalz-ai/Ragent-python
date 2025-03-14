@@ -3,8 +3,8 @@ import json
 from typing import List, Optional
 from dataclasses import dataclass, field
 from supervisor_agent1 import SupervisorAgent, SupervisorAgentOptions
-from multi_agent_orchestrator.types import ConversationMessage, ParticipantRole
-from multi_agent_orchestrator.utils import Logger
+from rAgent.types import ConversationMessage, ParticipantRole
+from rAgent.utils import Logger
 from RXAgent import RXAgent, RXAgentOptions
 from tweeter_tool import Xtools
 from datetime import datetime, timedelta
@@ -12,8 +12,9 @@ import threading
 @dataclass
 class RXTeamSupervisorOptions(SupervisorAgentOptions):
     authen_key: str =field(default="")
-    api_url: str = " https://rome-api-v2.rivalz.ai/agent"
+    api_url: str = "https://staging-rome-api-v2.rivalz.ai/agent"
     token_refresh_minutes: int = 110
+    number_of_agents: int = 3
 
 class RXTeamSupervisor(SupervisorAgent):
     def __init__(self, options: RXTeamSupervisorOptions):
@@ -22,12 +23,13 @@ class RXTeamSupervisor(SupervisorAgent):
         self.token_refresh_minutes = options.token_refresh_minutes
         self.last_refresh_time = None
         self.refresh_timer = None
+        self.number_of_agents = options.number_of_agents or 3
         super().__init__(options)
 
     def authenticate_and_create_team(self) -> None:
         """Fetch access tokens and create RX agent team"""
         try:
-            params = {'authen_key': self.authen_key}
+            params = {'authen_key': self.authen_key, 'num': self.number_of_agents}
             response = requests.get(self.api_url, params=params)
             if response.status_code == 200:
                 data = response.json()
@@ -118,7 +120,7 @@ class RXTeamSupervisor(SupervisorAgent):
         """Refresh tokens for existing agents"""
         Logger.info("Refreshing access tokens...")
         try:
-            params = {'authen_key': self.authen_key}
+            params = {'authen_key': self.authen_key, 'num': self.number_of_agents}
             response = requests.get(self.api_url, params=params)
             
             if response.status_code == 200:

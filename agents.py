@@ -1,5 +1,4 @@
-from multi_agent_orchestrator.agents import BedrockLLMAgent, BedrockLLMAgentOptions, AgentCallbacks
-# from ollamaAgent import OllamaAgent, OllamaAgentOptions
+from rAgent.agents import AgentCallbacks
 from openaiAgent import OpenAIAgent, OpenAIAgentOptions
 from RXAgent import RXAgent, RXAgentOptions
 import asyncio
@@ -115,15 +114,11 @@ def create_X_agent():
                 'topP': 0.8,
                 'stopSequences': []
             },
-            tool_config={
-            'tool': Xtools,
-            'toolMaxRecursions': 5,  # Maximum number of tool calls in one conversation
-            },
             callbacks=ChainlitAgentCallbacks()
         )
     return RXAgent(options)
 
-def create_rx_supervisor(storage = None):
+def create_rx_supervisor(storage = None, num_agents=3):
     lead_agent = OpenAIAgent(OpenAIAgentOptions(
         api_key=DEEP_INFRA_KEY,
         name="SupervisorAgent",
@@ -150,6 +145,7 @@ def create_rx_supervisor(storage = None):
             storage = storage,
             callbacks=ChainlitAgentCallbacks(),
             share_global_memory=True,
+            number_of_agents=num_agents,
             
         )
     )

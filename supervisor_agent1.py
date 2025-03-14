@@ -2,13 +2,13 @@ from typing import Optional, Any, AsyncIterable, Union, TYPE_CHECKING
 from dataclasses import dataclass, field
 import asyncio
 import random
-from multi_agent_orchestrator.agents import Agent, AgentOptions
+from rAgent.agents import Agent, AgentOptions
 if TYPE_CHECKING:
-    from multi_agent_orchestrator.agents import AnthropicAgent, BedrockLLMAgent
+    from rAgent.agents import AnthropicAgent, BedrockLLMAgent
     from openaiAgent import OpenAIAgent
 
-from multi_agent_orchestrator.types import ConversationMessage, ParticipantRole, TimestampedMessage
-from multi_agent_orchestrator.utils import Logger
+from rAgent.types import ConversationMessage, ParticipantRole, TimestampedMessage
+from rAgent.utils import Logger
 from tools import AgentTools, AgentTool
 from typing import Optional, Union
 from chat_storage import ChatStorage
@@ -28,13 +28,13 @@ class SupervisorAgentOptions(AgentOptions):
         # Get the actual class names as strings for comparison
         valid_agent_types = []
         try:
-            from multi_agent_orchestrator.agents import BedrockLLMAgent
+            from rAgent.agents import BedrockLLMAgent
             valid_agent_types.append(BedrockLLMAgent)
         except ImportError:
             pass
 
         try:
-            from multi_agent_orchestrator.agents import AnthropicAgent
+            from rAgent.agents import AnthropicAgent
             valid_agent_types.append(AnthropicAgent)
         except ImportError:
             pass
