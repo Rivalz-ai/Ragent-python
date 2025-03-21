@@ -1,0 +1,19 @@
+chainlit==2.0.1
+# multi_agent_orchestrator==0.1.2
+pydantic==2.10.1
+openai==1.63.0
+python-dotenv==1.0.1
+pytest
+coverage
+boto3
+botocore
+anthropic
+moto
+pytest-mock
+pytest-asyncio
+libsql-client
+PyYAML
+# Database
+aiosqlite==0.19.0
+sqlalchemy[asyncio]
+aiohttp==3.11.12

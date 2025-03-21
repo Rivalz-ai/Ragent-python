@@ -1,0 +1,23 @@
+# X (Twitter) Account Credentials
+accounts:
+  - name: "Account 1"
+    client_id: ""
+    client_secret: ""
+    refresh_token: ""
+    access_token: ""
+    
+  - name: "Account 2"
+    client_id: ""
+    client_secret: ""
+    refresh_token: ""
+    access_token: ""    
+  - name: "Account 3"
+    client_id: ""
+    client_secret: ""
+    refresh_token: ""
+    access_token: ""
+# You can add more accounts as needed by following the same structure
+# Instructions:
+# 1. Replace the empty strings with actual credentials
+# 2. Each account must have all three fields filled
+# 3. Add or remove account blocks as necessary
