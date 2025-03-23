@@ -99,8 +99,10 @@ export default function CustomProgressBar() {
                 <ul className="space-y-2">
                   {props.completedLinks.map((link, index) => (
                     <li key={index} className="text-xs flex items-start">
-                      <ExternalLink className="h-3 w-3 mr-1 flex-shrink-0 mt-0.5 text-blue-500" />
-                      <span className="break-all">{link}</span>
+                      <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center">
+                        <ExternalLink className="h-3 w-3 mr-1 flex-shrink-0 mt-0.5 text-blue-500" />
+                        <span className="break-all">{link}</span>
+                      </a>
                     </li>
                   ))}
                 </ul>

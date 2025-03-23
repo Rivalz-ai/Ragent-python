@@ -19,7 +19,7 @@ class SupervisorAgentOptions(AgentOptions):
     trace: Optional[bool] = None # enable tracing/logging
     extra_tools: Optional[Union[AgentTools, list[AgentTool]]] = None # add extra tools to the lead_agent
     type: str = "default"  # routing type: default, broadcast, random
-
+    sequentially: bool = False # send messages to agents sequentially
     def validate(self) -> None:
         # Get the actual class names as strings for comparison
         valid_agent_types = []
@@ -85,7 +85,8 @@ class SupervisorAgent(Agent):
         self.session_id = ''
         self.additional_params = None
         self.type = options.type
-
+        self.sequentially = options.sequentially
+        
         self._configure_supervisor_tools(options.extra_tools)
         self._configure_prompt()
 
@@ -195,18 +196,17 @@ class SupervisorAgent(Agent):
                                   for agent in self.team)
 
         self.prompt_template = f"""\n
-You are a {self.name}.
-{self.description}
-
-You can interact with the following agents in this environment using the tools:
-<agents>
-{agent_list_str}
-</agents>
-
-Here are the tools you can use:
-<tools>
-{tools_str}
-</tools>
+            You are a {self.name}.\n
+            Your information: {self.description} \n
+            You can interact with the following agents in this environment using the tools:\n
+            <list-agents>
+            {agent_list_str}
+            </list-agents>
+            \n
+            Here are the tools you can use:
+            <tools>
+            {tools_str}
+            </tools>
 
 When communicating with other agents, including the User, please follow these guidelines:
 <guidelines>

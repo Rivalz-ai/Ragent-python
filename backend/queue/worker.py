@@ -6,6 +6,7 @@ from backend.db.models import Task
 from rAgent.ragents.x_tool import post_to_X  # Giả định bạn có hàm này
 import queue
 import random
+from backend.utils import TASK_STATUS_MAP
 def process_queue(queues, is_running):
     """
     Xử lý các items trong queue
@@ -24,6 +25,7 @@ def process_queue(queues, is_running):
             task_id = item["task_id"]
             content = item["content"]
             access_token = item["access_token"]
+            x_id = item["x_id"]
             
             Logger.info(f"Processing task {task_id}")
             
@@ -31,7 +33,7 @@ def process_queue(queues, is_running):
             result = post_to_X(content, access_token)
             
             # Cập nhật trạng thái task trong database
-            update_task_status(task_id, result)
+            update_task_status(task_id, x_id,result)
             
             # Đánh dấu task đã hoàn thành trong queue
             queues.task_done()
@@ -43,7 +45,7 @@ def process_queue(queues, is_running):
             Logger.error(f"Error processing queue item: {str(e)}")
             time.sleep(5)  # Chờ trước khi thử lại
 
-def update_task_status(task_id, result):
+def update_task_status(task_id,x_id, result):
     """
     Cập nhật trạng thái task trong database
     """
@@ -55,7 +57,7 @@ def update_task_status(task_id, result):
             return
         
         # Kiểm tra xem post có thành công không
-        if "Tweet posted" in result:
+        if "https://twitter.com/i/web/status" in result:
             task.status = 1  # 1: hoàn thành
             task.results = result
         else:
@@ -64,7 +66,7 @@ def update_task_status(task_id, result):
         
         task.updatedAt = datetime.utcnow()
         db.commit()
-        Logger.info(f"Updated task {task_id} status to {task.status}")
+        Logger.info(f"Updated task {task_id},  and x_id is {x_id} status to {TASK_STATUS_MAP[task.status]}")
     except Exception as e:
         db.rollback()
         Logger.error(f"Error updating task status: {str(e)}")

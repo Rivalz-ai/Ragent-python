@@ -145,9 +145,9 @@ def post_to_X(tweet_text:str, access_token:str) -> str:
             and status code: {rest_post_results.status_code}, track the tweet at https://twitter.com/i/web/status/{id}"""
         id2 = rest_post_results.json()["data"]["id"]
         Logger.info(f"Tweet replied the rest posted. {id2}")
-        return f"Tweet posted with id: {id} and replied with id: {id2}, track the tweet at https://twitter.com/i/web/status/{id}"
-    return f"Tweet posted success with id: {id}, track the tweet at https://twitter.com/i/web/status/{id}"
-    # return "Tweet posted success with id: 123456789, track the tweet at https://twitter.com/i/web/status/123456789"
+        return f"https://twitter.com/i/web/status/{id}"
+    return f"https://twitter.com/i/web/status/{id}"
+    # return "https://twitter.com/i/web/status/123456789"
 
 
 
@@ -166,7 +166,6 @@ post_X_tool = AgentTool(
         }
     },
     func=post_to_X,
-    # enum_values={"units": ["celsius", "fahrenheit"]}
 )
 # Create a tool definition with name and description
 Xtools:AgentTools = AgentTools(tools=[post_X_tool])

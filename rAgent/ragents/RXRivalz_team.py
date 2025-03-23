@@ -66,8 +66,7 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
                 agent = RXRivalzAgent(RXAgentRivalzOptions(
                     name=f"RX_Agent_{idx + 1}",
                     description=(
-                        f"Social media (Twitter/X) posting agent #{idx + 1}"
-                        " - can post tweets and handle replies."
+                        f"Social media (Twitter/X) agent with X_ID is {x_id}"	
                     ),
                     api_key=self.lead_agent.api_key,  # Use same OpenAI key as lead agent
                     model=self.lead_agent.model,  # Use same OpenAI model as lead agent

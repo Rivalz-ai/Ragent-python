@@ -3,3 +3,8 @@ __pycache__/*
 .venv/*
 .env
 .DS_Store
+.files/*
+rAgent/ragents/__pycache__/*
+rAgent/ragents/.DS_Store
+rAgent/ragents/.files/*
+rAgent/ragents/.venv/*

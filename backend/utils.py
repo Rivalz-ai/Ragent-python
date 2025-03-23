@@ -2,6 +2,12 @@ from rAgent.orchestrator import SwarmOrchestrator
 from rAgent.agents import SupervisorAgent
 import re
 import yaml
+
+TASK_STATUS_MAP = {
+    0: "Pending",
+    1: "Done",
+    2: "Failed"
+}
 def generate_start_message(orchestrator: SwarmOrchestrator) -> str:
     message = "You are interacting with the following agents:\n"
     for agent_id in orchestrator.agents:

@@ -55,7 +55,8 @@ class PostQueueManager:
         self.queue.put({
             "task_id": task_id,
             "content": content,
-            "access_token": access_token
+            "access_token": access_token,
+            "x_id": x_id
         })
         
         # Đảm bảo worker đang chạy

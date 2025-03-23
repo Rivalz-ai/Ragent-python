@@ -54,7 +54,7 @@ def get_rx_task_stats(thread_id: Optional[str] = None, db: Session = Depends(get
     completed_tasks_filter.append(Task.status == 1)
     completed_tasks = db.query(Task).filter(
         *completed_tasks_filter
-    ).order_by(Task.updatedAt.desc()).limit(10).all()
+    ).order_by(Task.updatedAt.desc()).all()
     
     # Trích xuất kết quả
     result_links = [task.results for task in completed_tasks if task.results]
@@ -99,4 +99,4 @@ def enqueue_rx_post(request: PostRequest):
         thread_id=request.thread_id
     )
     
-    return {"task_id": task_id, "status": "queued"}
+    return {"task_id": task_id,'x_id':request.x_id, "status": "queued"}
