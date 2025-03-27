@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 from rAgent.types import ConversationMessage, ParticipantRole, TimestampedMessage
 from rAgent.utils import Logger, AgentTools, AgentTool
 from rAgent.storage import ChatStorage, InMemoryChatStorage
-
+import json
 @dataclass
 class SupervisorAgentOptions(AgentOptions):
     lead_agent: Agent = None # The agent that leads the team coordination
@@ -150,24 +150,6 @@ class SupervisorAgent(Agent):
                     required=["messages"],
                     func=self.send_messages
                 )])
-        elif self.type == "selection":
-            self.supervisor_tools = AgentTools([AgentTool(
-                name='selection_messages',
-                strict=False,
-                description='Decide number of agents is used to send message then send message from user to it!',
-                properties={
-                    "num_agents": {
-                        "type": "number",
-                        "description": "Number of agents to randomly select."
-                        },
-                    "content": {
-                        "type": "string",
-                        "description": "The content users send to Agents."
-                    }
-                },
-                required=["num_agents", "content"],
-                func=self.select_agent
-            )])
         else:
             self.supervisor_tools= AgentTools([])
 
@@ -392,7 +374,6 @@ When communicating with other agents, including the User, please follow these gu
             self.user_id = user_id
             self.session_id = session_id
             self.additional_params = additional_params
-            print(self.additional_params)
             agents_history = await self.storage.fetch_all_chats(user_id, session_id)
             agents_memory = self._format_agents_memory(agents_history)
 
@@ -404,8 +385,36 @@ When communicating with other agents, including the User, please follow these gu
                     input_text, user_id, session_id, chat_history, additional_params
                 )
             elif self.type == "selection":
-                return await self.lead_agent.process_request(
-                    input_text, user_id, session_id, chat_history, additional_params
+                responses = self.num_agent(agents_history, input_text)
+                number_of_agents = responses.get('number', 0)
+                content = responses.get('content', 'NO')
+                task = responses.get('task', '')
+                Logger.info(f"Number of agents: {number_of_agents}, Content: {content}, Task: {task}")
+                if content == "NO" and number_of_agents == 0:
+                    return ConversationMessage(
+                    role = "assistant",
+                    content=[{"text": f"You must provide the number of agents and topic/content to process jobs {task}!"}]
+                )
+                elif number_of_agents == 0:
+                    return ConversationMessage(
+                    role = "assistant",
+                    content=[{"text": f"You must provide the number of agents to process jobs {task}!"}]
+                )
+                
+                elif content == "NO":
+                    return ConversationMessage(
+                    role = "assistant",
+                    content=[{"text": f"You must provide the content to process jobs {task}!"}]
+                )
+                
+                responses_from_agents =  await self.select_agent(number_of_agents, f"Do the {task} with {content}")
+                new_input = f"Here is the total respones from memeber Agents: {responses_from_agents}, Summarize the answers of member Agents and respond to users in a unified manner"
+                conversations = await self.lead_agent.process_request(
+                    new_input, user_id, session_id, chat_history, additional_params
+                )
+                return ConversationMessage(
+                    role = conversations.role,
+                    content=[{"text": responses_from_agents+"\n" + conversations.content[0].get('text', '')}]
                 )
             
             elif self.type == "broadcast":
@@ -424,3 +433,25 @@ When communicating with other agents, including the User, please follow these gu
         except Exception as e:
             Logger.error(f"Error in process_request: {e}")
             raise e
+        
+    
+    def num_agent(self, chat_history, input_text):
+        
+        messages = [{"role": "system", "content": "Extract the task what agent do and Decide number of member agents in team, and the information for member Agent doing task that lead agent should send the message to, if context not provided number or content for doing task, return " + json.dumps({"task":"the task","number": 0, "content":"NO"}) + "\n. Provide output in valid JSON format. The data should be like this ." + json.dumps({"task":"the task","number": "num_agents", "content":"the content for member agent doing task"}) + "CHECK ALL THE CHAT HISTORY TO CHOOSE **THE NUMBER OF AGENT** AND **CONTENT**"}] + [
+            {"role": "user" if msg.role == ParticipantRole.USER.value else "assistant",
+             "content": msg.content[0]['text'] if msg.content else ''} for msg in chat_history
+        ]
+        
+        messages.append({"role": "user", "content": input_text})
+        print(messages)
+        response =  self.lead_agent.client.chat.completions.create(
+            model='gpt-4o',
+            messages=messages,
+            response_format={"type":"json_object"},
+            max_tokens=768,
+            temperature=0,
+        ).choices[0].message.content
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError:
+            return {"task":"the task","number": 0, "content":"NO"}

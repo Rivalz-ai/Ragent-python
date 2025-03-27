@@ -16,6 +16,7 @@ from rAgent.utils import AgentTool, AgentTools
 from rAgent.types import AgentProviderType
 from rAgent.ragents.x_tool import post_tweet, post_reply_tweet, split_post
 import requests
+import os
 @dataclass
 class RXAgentRivalzOptions(AgentOptions):
     api_key: str = None
@@ -28,15 +29,20 @@ class RXAgentRivalzOptions(AgentOptions):
     client: Optional[Any] = None
     extra_tools: Optional[Union[AgentTools, list[AgentTool]]] = None
     default_max_recursions: int = 2
-    xaccesstoken: str = None
+    xaccesstoken: Optional[str] = None
     xrefreshtoken: Optional[str] = None
-    x_id: Optional[str] = None
     client_id: Optional[str] = None
     client_secret : Optional[str] = None
-    session_id: Optional[str] = None
-
-
-
+    
+    x_id: str = None
+    followers_count: Optional[int] = None
+    following_count: Optional[int] = None
+    tweet_count: Optional[int] = None
+    like_count: Optional[int] = None
+    example_post: Optional[str] = None
+    style_description: Optional[str] = None
+    project_auth_token:str = None
+    api_post: str = "https://staging-rome-api-v2.rivalz.ai/agent"
 class RXRivalzAgent(Agent):
 
     PERSONALITY_TRAITS = {
@@ -64,12 +70,23 @@ class RXRivalzAgent(Agent):
         self.streaming = options.streaming or False
         self.retriever: Optional[Retriever] = options.retriever
         self.default_max_recursions = options.default_max_recursions
+        self.session_id = ""
+
+        ## for rx verification
         self.xaccesstoken = options.xaccesstoken
         self.xrefreshtoken = options.xrefreshtoken or None
         self.client_id = options.client_id or None
         self.client_secret = options.client_secret or None
-        self.session_id = ""
         self.x_id = options.x_id or None
+        self.followers_count = options.followers_count or None
+        self.following_count = options.following_count or None
+        self.tweet_count = options.tweet_count or None
+        self.like_count = options.like_count or None
+        self.example_post = options.example_post or None
+        self.style_description = options.style_description or self.create_random_persona()
+        self.description = options.description or self.generate_description()
+        self.project_auth_token = options.project_auth_token
+        self.api_post = options.api_post
         # Default inference configuration
         default_inference_config = {
             'maxTokens': 1000,
@@ -120,17 +137,18 @@ class RXRivalzAgent(Agent):
         ----
 
 
-        When user asks for a tweet, you should:
+        When user asks for a TWEET, you should:
             1 If user asks for a tweet, WITHOUT ANY CONTEXT, GLOBAL CONTEXT ONLY ABOUT GREETING you should **ASK** for more information.
-            2. If FULL CONVERSATION HISTORY have information for posting to tweet; Base your content on the FULL CONVERSATION HISTORY across all agents
-            3. Consider both direct conversations with you and conversations with other agents
-            4. Choose the most appropriate approach:
+            2. However, if user asks for a tweet like Do the post about ..., you should **POST** the tweet with the paraphrased content.
+            3. If FULL CONVERSATION HISTORY have information for posting to tweet; Base your content on the FULL CONVERSATION HISTORY across all agents
+            4. Consider both direct conversations with you and conversations with other agents
+            5. Choose the most appropriate approach:
                 - Keep original content if it's clear and effective
                 - Enhance content based on your style and expertise
                 - Ask for clarification if necessary
-            5. Please DO NOT PROVIDE THE ACCESS TOKEN IN THE RESPONSE
-            6. If the tweet is queued to post, PROVIDE A RESPONSE with task_id.
-            7. If the tweet can not queued, PROVIDE A RESPONSE with the ORIGINAL ERROR (PLEASE DO NOT REWRITE IT) WITH YOUR SUGGESTION TO FIX BUG.
+            6. Please DO NOT PROVIDE THE ACCESS TOKEN IN THE RESPONSE
+            7. If the tweet is queued to post, PROVIDE A RESPONSE with task_id.
+            8. If the tweet can not queued, PROVIDE A RESPONSE with the ORIGINAL ERROR (PLEASE DO NOT REWRITE IT) WITH YOUR SUGGESTION TO FIX BUG.
         
         ---
 
@@ -443,33 +461,34 @@ class RXRivalzAgent(Agent):
             raise Exception(f"Failed to refresh token: {response.status_code} - {response.text}")
 
 
-    def create_random_persona(self,content) -> Dict[str, str]:
+    def create_random_persona(self) -> Dict[str, str]:
         #keywords = self.generate_keywords(content)
-        return {
+        return json.dumps({
             "agent_name": self.name,
             "personality": random.choice(self.PERSONALITY_TRAITS["personality"]),
             "tone": random.choice(self.PERSONALITY_TRAITS["tone"]),
             "style": random.choice(self.PERSONALITY_TRAITS["style"]),
             "perspective": random.choice(self.PERSONALITY_TRAITS["perspective"]),
             #"extra_keyword": keywords  # Thêm từ khóa ngẫu nhiên
-        }
+        })
     
     def paraphrase(self, content:str) -> str:
-        persona = self.create_random_persona(content)
+        persona = self.style_description
+        description = self.description
+        example_post = self.example_post
+
         number_words = random.randint(50, 280)
         response = self.client.chat.completions.create(
             model='gpt-4o',
             messages=[
             {"role": "system", "content": f"""
-            You have personal information like:
-             {json.dumps(persona)}. \n\n
+            You are a {description} with the following persona: {persona}. You have an example post that reads: {example_post}.
             """
             },
-            {"role": "user", "content": f"""Provide a paraphrased version with {number_words} words of the following content:
-            {content}"""}
+            {"role": "user", "content": f"""Provide a paraphrased version or generate a new POST with {number_words} words of the following content or topic: \n\n\"\"\"{content}\"\"\""""}
             ],
-            max_tokens=700,
-            temperature=1.0,
+            max_tokens=512,
+            temperature=0.9,
         ).choices[0].message.content
         return response
 
@@ -483,21 +502,33 @@ class RXRivalzAgent(Agent):
         try:
             content = self.paraphrase(tweet_text)
             # API endpoint to add the post to the queue
-            response = requests.post(
-            "http://localhost:8000/api/tasks/rx/enqueue",
-            json={
-                "content": content,  # The content to be posted
-                "access_token": self.xaccesstoken,  # User's access token for X
-                "thread_id": self.session_id,  # Session ID for thread tracking
-                "x_id": self.x_id
+
+            url_post = f"{self.api_post}/agent/task"
+            headers = {
+                "Authorization": f"Bearer {self.project_auth_token}",
+                "Content-Type": "application/json"
             }
-            )
+            payload = {
+                "type": 3,
+                "session_id": self.session_id,  # Session ID for thread tracking
+                "data": {
+                    "posts": [{
+                        "content": content,
+                        "x_id": self.x_id
+                    }]
+                }
+            }
+            authen_key = self.project_auth_token  # Replace <key> with the actual authentication key
+            url_post_with_key = f"{url_post}?authen_key={authen_key}"
+            Logger.info(f"Posting to {url_post_with_key} with payload: {json.dumps(payload)}")
+            response = requests.post(url_post_with_key, headers=headers, json=payload)
             
             data = response.json()
-            task_id = data["task_id"]
-            
+            if response.status_code != 200:
+                raise Exception(f"Error queueing post: {data.get('message')}")
+            job_id= data.get('data').get('job_id')            
             # Return message to the user
-            return f"Tweet has been added to the queue with ID: {task_id}. You can check its status in the sidebar."
+            return f"ADDED to Queues with ID {job_id}. You can check its status in the sidebar."
         except Exception as e:
             Logger.error(f"Error queueing post: {str(e)}")
             return f"Error adding tweet to queue: {str(e)}"
@@ -519,3 +550,17 @@ class RXRivalzAgent(Agent):
             return json.loads(response)['keywords'][index]
         except json.JSONDecodeError:
             return response[:10]
+    
+    def generate_description(self)->str:
+        if self.description is None and self.followers_count is not None:
+            default = f"""Social media (Twitter/X) agent with X_ID is {self.x_id}.\n\n
+                        The agent has {self.followers_count} followers, follows {self.following_count} accounts, and has made {self.tweet_count} tweets.\n\n
+                        The agent has liked {self.like_count} tweets and has an example post that reads: {self.example_post}.\n\n"""
+            
+            if self.followers_count < 1000:
+                return default + "I am a new agent with a small following."
+            elif self.followers_count < 10000:
+                return default+"I am a growing agent with a moderate following."
+            else:
+                return default+"I am a popular agent with a large following."
+        return "Social media (Twitter/X) agent"

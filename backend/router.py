@@ -33,7 +33,7 @@ travel_agent = create_travel_agent()
 
 default_agent = create_default_agent()
 # Create RX Team Supervisor
-rx_supervisor = create_rx_supervisor(storage = shared_storage, num_agents=99)
+rx_supervisor = create_rx_supervisor(storage = shared_storage, num_agents=9)
 Logger.info("All agents created successfully")
 
 # Initialize orchestrator

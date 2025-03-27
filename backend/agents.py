@@ -10,7 +10,7 @@ import asyncio
 from rAgent.classifiers import OpenAIClassifier, OpenAIClassifierOptions
 from rAgent.utils import Logger
 import chainlit as cl
-from rAgent.ragents.RXRivalz_team import RXTeamSupervisorRivalz, RXTeamSupervisorRivalzOptions
+from rAgent.ragents.RXRivalz_team_V1 import RXTeamSupervisorRivalz, RXTeamSupervisorRivalzOptions
 from rAgent.ragents.RX_team import RXTeamSupervisor, RXTeamSupervisorOptions
 from backend.utils import read_x_token_yml
 import os
@@ -24,6 +24,7 @@ DEEP_INFRA_KEY = os.getenv("deep_infra_api_key")
 DEEP_INFRA_URL = os.getenv("base_url")
 DEEP_INFRA_MODEL= os.getenv("deep_infra_model")
 auth_key = os.getenv("auth_key")
+RIVALZ_API_URL = os.getenv("RIVAL_URL")
 
 class ChainlitAgentCallbacks(AgentCallbacks):
     def __init__(self):
@@ -171,11 +172,12 @@ def create_rx_supervisor(storage = None, num_agents=99):
     ))
     supervisor = RXTeamSupervisorRivalz(
         RXTeamSupervisorRivalzOptions(
-            type="broadcast",
+            type="selection",
             name="RX_Team_Supervisor",
             description="Manages team of social media posting agents",
             lead_agent=lead_agent,  # Your configured lead agent
             authen_key=auth_key,
+            api_url=RIVALZ_API_URL,
             trace=True,
             storage = storage,
             callbacks=ChainlitAgentCallbacks(),

@@ -34,7 +34,7 @@ class AgentCallbacks:
 @dataclass
 class AgentOptions:
     name: str
-    description: str
+    description: Optional[str] = None
     save_chat: bool = True
     callbacks: Optional[AgentCallbacks] = None
     share_global_memory:Optional[bool]= False
