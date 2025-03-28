@@ -10,6 +10,10 @@ import re
 import asyncio
 import requests
 import aiohttp
+import os
+
+RIVALZ_URL = os.getenv("RIVAL_URL")
+auth_key = os.getenv("auth_key")
 # Flag để kiểm soát background task
 polling_active = True
 
@@ -20,13 +24,22 @@ async def update_task_stats(session_id:str):
             try:
                 # Gọi API để lấy thống kê task
                 Logger.info(f"Fetching task stats...")
-                async with session.get(f"http://localhost:8000/api/tasks/rx/stats?thread_id={session_id}") as response:
+                stat_url = RIVALZ_URL + f"/agent/task/rx/stats?authen_key={auth_key}&thread_id={session_id}"
+                async with session.get(stat_url) as response:
                     response_text = await response.text()
                     Logger.info(f"Received task stats response: {response_text}")
                     stats = await response.json()
-                
+                    stats = stats["data"]
                 # Tính toán giá trị progress
                 value = int(stats["completion_percentage"])
+
+                # Prepare list_failed (handle null case)
+                list_failed = stats.get("list_failed", []) or []
+                
+                # Transform tweet IDs into full Twitter URLs
+                completed_links = []
+                for tweet_id in stats["list_result_done"]:
+                    completed_links.append(f"https://twitter.com/i/web/status/{tweet_id}")
                 
                 # Cập nhật sidebar với progress bar
                 await cl.ElementSidebar.set_elements([
@@ -42,7 +55,8 @@ async def update_task_stats(session_id:str):
                             "failed": stats["failed"], 
                             "pending": stats["pending"]
                         },
-                        "completedLinks": stats["list_result_done"]  
+                        "completedLinks": completed_links,
+                        "list_failed": list_failed  
                         }
                     ),
                     ])

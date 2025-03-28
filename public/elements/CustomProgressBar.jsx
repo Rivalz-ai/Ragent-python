@@ -1,34 +1,7 @@
-// import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-// import { Badge } from "@/components/ui/badge"
-// import { Progress } from "@/components/ui/progress"
-// import { Clock, User, Tag } from "lucide-react"
-
-// export default function CustomProgressBar() {
-//   return (
-//     <Card className="w-full max-w-md">
-//       <CardHeader className="pb-2">
-//         <div className="flex justify-between items-center">
-//           <CardTitle className="text-lg font-medium">
-//             {props.title || "Jobs to do"}
-//           </CardTitle>
-//         </div>
-//       </CardHeader>
-
-//       <CardContent>
-//         <div className="space-y-4">
-//           <span className="text-sm font-semibold">
-//             {props.progressName || "RX post"}
-//           </span>
-//           <Progress value={props.value||10} className="h-2" />
-//         </div>
-//       </CardContent>
-//     </Card>
-//   )
-// }
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { CheckCircle, XCircle, Clock, ExternalLink } from "lucide-react"
+import { CheckCircle, XCircle, Clock, ExternalLink, AlertCircle } from "lucide-react"
 
 export default function CustomProgressBar() {
   return (
@@ -103,6 +76,31 @@ export default function CustomProgressBar() {
                         <ExternalLink className="h-3 w-3 mr-1 flex-shrink-0 mt-0.5 text-blue-500" />
                         <span className="break-all">{link}</span>
                       </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+          
+          {/* Failed tasks section - only show if there are failed tasks */}
+          {props.list_failed && props.list_failed.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm font-semibold mb-2 text-red-500 flex items-center">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Failed Tasks:
+              </h4>
+              <div className="max-h-48 overflow-y-auto bg-red-50 rounded-md p-2 border border-red-200">
+                <ul className="space-y-2">
+                  {props.list_failed.map((item, index) => (
+                    <li key={index} className="text-xs bg-white p-2 rounded shadow-sm border border-red-100">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-red-600 mb-1">{item.error}</span>
+                        <div className="flex justify-between text-gray-500">
+                          <span>Task ID: {item.task_id}</span>
+                          <span>X ID: {item.x_id}</span>
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
