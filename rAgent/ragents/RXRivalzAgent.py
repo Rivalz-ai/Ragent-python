@@ -504,24 +504,21 @@ class RXRivalzAgent(Agent):
             # API endpoint to add the post to the queue
 
             url_post = f"{self.api_post}/agent/task"
-            headers = {
-                "Authorization": f"Bearer {self.project_auth_token}",
-                "Content-Type": "application/json"
-            }
+
             payload = {
                 "type": 3,
                 "session_id": self.session_id,  # Session ID for thread tracking
                 "data": {
                     "posts": [{
                         "content": content,
-                        "x_id": self.x_id
+                        "x_id": str(self.x_id)
                     }]
                 }
             }
             authen_key = self.project_auth_token  # Replace <key> with the actual authentication key
             url_post_with_key = f"{url_post}?authen_key={authen_key}"
             Logger.info(f"Posting to {url_post_with_key} with payload: {json.dumps(payload)}")
-            response = requests.post(url_post_with_key, headers=headers, json=payload)
+            response = requests.post(url_post_with_key, json=payload)
             
             data = response.json()
             if response.status_code != 200:
