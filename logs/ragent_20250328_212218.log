@@ -1,0 +1,45 @@
+2025-03-28 21:22:18,561 - INFO - Logging configured to file: logs/ragent_20250328_212218.log
+2025-03-28 21:22:22,207 - INFO - ℹ️  INFO - New chat session starting
+2025-03-28 21:22:22,208 - INFO - ℹ️  INFO - Created user_id: bc929c03-030d-4d1f-a9ad-1b1b9a952632, session_id: ca4811a3-9dd5-4c72-80f5-3cf7537748b0
+2025-03-28 21:22:22,208 - INFO - ℹ️  INFO - Forced token refresh for RX Supervisor on session start
+2025-03-28 21:22:22,214 - INFO - ℹ️  INFO - Chat session started successfully
+2025-03-28 21:22:22,312 - INFO - ℹ️  INFO - Initialized sidebar with empty progress bar
+2025-03-28 21:22:22,313 - INFO - ℹ️  INFO - Started background task for updating task statistics
+2025-03-28 21:22:22,315 - INFO - ℹ️  INFO - Fetching task stats... for session: ca4811a3-9dd5-4c72-80f5-3cf7537748b0
+2025-03-28 21:22:22,649 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":null,"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-28 21:22:29,661 - INFO - ℹ️  INFO - Updated task stats
+2025-03-28 21:22:29,661 - INFO - ℹ️  INFO - Fetching task stats... for session: ca4811a3-9dd5-4c72-80f5-3cf7537748b0
+2025-03-28 21:22:29,751 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":null,"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-28 21:22:36,756 - INFO - ℹ️  INFO - Updated task stats
+2025-03-28 21:22:36,757 - INFO - ℹ️  INFO - Fetching task stats... for session: ca4811a3-9dd5-4c72-80f5-3cf7537748b0
+2025-03-28 21:22:36,835 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":null,"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-28 21:22:39,379 - INFO - ℹ️  INFO - Processing message for user: bc929c03-030d-4d1f-a9ad-1b1b9a952632, session: ca4811a3-9dd5-4c72-80f5-3cf7537748b0
+2025-03-28 21:22:46,618 - INFO - INFO - 
+** CLASSIFIED INTENT **
+2025-03-28 21:22:46,619 - INFO - =======================
+2025-03-28 21:22:46,619 - INFO - ℹ️  INFO - > Text: hello
+2025-03-28 21:22:46,619 - INFO - ℹ️  INFO - > Selected Agent: No agent selected
+2025-03-28 21:22:46,619 - INFO - ℹ️  INFO - > Confidence: 0.50
+2025-03-28 21:22:46,619 - INFO - ℹ️  INFO - 
+2025-03-28 21:22:46,619 - INFO - ℹ️  INFO - Using default agent as no agent was selected
+2025-03-28 21:22:46,620 - INFO - INFO - 
+** AGENT GENERAL-AGENT CHAT HISTORY **
+2025-03-28 21:22:46,620 - INFO - ======================================
+2025-03-28 21:22:46,620 - INFO - > - None -
+2025-03-28 21:22:46,620 - INFO - 
+2025-03-28 21:22:47,571 - INFO - INFO - 
+** EXECUTION TIMES **
+2025-03-28 21:22:47,572 - INFO - =====================
+2025-03-28 21:22:47,572 - INFO - > Classifying user intent: 7.222638130187988s
+2025-03-28 21:22:47,572 - INFO - > Agent General Agent | Processing request: 0.9506502151489258s
+2025-03-28 21:22:47,572 - INFO - 
+2025-03-28 21:22:47,572 - INFO - ℹ️  INFO - Received response from orchestrator for user: bc929c03-030d-4d1f-a9ad-1b1b9a952632
+2025-03-28 21:22:47,610 - INFO - ℹ️  INFO - Updated task stats
+2025-03-28 21:22:47,610 - INFO - ℹ️  INFO - Fetching task stats... for session: ca4811a3-9dd5-4c72-80f5-3cf7537748b0
+2025-03-28 21:22:47,689 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":null,"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-28 21:22:54,697 - INFO - ℹ️  INFO - Updated task stats
+2025-03-28 21:22:54,698 - INFO - ℹ️  INFO - Fetching task stats... for session: ca4811a3-9dd5-4c72-80f5-3cf7537748b0
+2025-03-28 21:22:54,782 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":null,"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-28 21:23:01,788 - INFO - ℹ️  INFO - Updated task stats
+2025-03-28 21:23:01,789 - INFO - ℹ️  INFO - Fetching task stats... for session: ca4811a3-9dd5-4c72-80f5-3cf7537748b0
+2025-03-28 21:23:01,867 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":null,"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}

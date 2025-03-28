@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict, Any
 import json
 import logging
+import os
 from datetime import datetime
 from rAgent.types import ConversationMessage, OrchestratorConfig
 
@@ -11,6 +12,8 @@ class Logger:
     """
     _instance = None
     _logger = None
+    _file_handler = None
+    _console_handler = None
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -39,6 +42,42 @@ class Logger:
     def set_logger(cls, logger: logging.Logger) -> None:
         """Set a custom logger."""
         cls._logger = logger
+
+    @classmethod
+    def setup_file_logging(cls, log_level=logging.INFO, log_dir="logs"):
+        """Set up logging to write to both file and console."""
+        # Create logs directory if it doesn't exist
+        os.makedirs(log_dir, exist_ok=True)
+        
+        # Generate timestamp for unique log file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = os.path.join(log_dir, f"ragent_{timestamp}.log")
+        
+        # Configure the logger
+        logger = cls.get_logger()
+        logger.setLevel(log_level)
+        
+        # Remove existing handlers if present
+        if cls._file_handler:
+            logger.removeHandler(cls._file_handler)
+        if cls._console_handler:
+            logger.removeHandler(cls._console_handler)
+        
+        # File handler
+        cls._file_handler = logging.FileHandler(log_file)
+        file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        cls._file_handler.setFormatter(file_formatter)
+        logger.addHandler(cls._file_handler)
+        
+        # Console handler (if not already attached)
+        cls._console_handler = logging.StreamHandler()
+        console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        cls._console_handler.setFormatter(console_formatter)
+        logger.addHandler(cls._console_handler)
+        
+        # Log the configuration
+        logger.info(f"Logging configured to file: {log_file}")
+        return log_file
 
     # Message formatting
     @classmethod
@@ -70,7 +109,7 @@ class Logger:
         """Log a debug message."""
         formatted_message = cls.format_message("DEBUG", message)
         cls.get_logger().debug(f"🐞  {formatted_message}", *args)
-
+    
     # Specialized formatting
     @classmethod
     def log_header(cls, title: str) -> None:

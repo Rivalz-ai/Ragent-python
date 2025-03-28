@@ -11,6 +11,12 @@ import asyncio
 import requests
 import aiohttp
 import os
+from rAgent.utils import Logger
+import logging
+# Other imports...
+
+# Set up logging to both file and console
+log_file = Logger.setup_file_logging(log_level=logging.INFO)
 
 RIVALZ_URL = os.getenv("RIVAL_URL")
 auth_key = os.getenv("auth_key")
