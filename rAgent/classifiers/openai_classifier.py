@@ -104,7 +104,8 @@ class OpenAIClassifier(Classifier):
                 temperature=self.inference_config['temperature'],
                 top_p=self.inference_config['top_p'],
                 tools=self.tools,
-                tool_choice=tool_choice
+                tool_choice=tool_choice,
+                timeout=20,
             )
 
             tool_call = response.choices[0].message.tool_calls[0]

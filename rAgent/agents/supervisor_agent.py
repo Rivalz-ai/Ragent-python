@@ -443,13 +443,13 @@ When communicating with other agents, including the User, please follow these gu
         ]
         
         messages.append({"role": "user", "content": input_text})
-        print(messages)
         response =  self.lead_agent.client.chat.completions.create(
             model='gpt-4o',
             messages=messages,
             response_format={"type":"json_object"},
             max_tokens=768,
             temperature=0,
+            timeout=20,
         ).choices[0].message.content
         try:
             return json.loads(response)

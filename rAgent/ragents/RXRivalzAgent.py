@@ -263,7 +263,8 @@ class RXRivalzAgent(Agent):
                 "temperature": self.inference_config.get('temperature'),
                 "top_p": self.inference_config.get('topP'),
                 "stop": self.inference_config.get('stopSequences'),
-                "stream": self.streaming
+                "stream": self.streaming,
+                "timeout": 20,
             }
 
             # Add tools configuration if available
@@ -489,6 +490,7 @@ class RXRivalzAgent(Agent):
             ],
             max_tokens=512,
             temperature=0.9,
+            timeout=20,
         ).choices[0].message.content
         return response
 
@@ -536,11 +538,13 @@ class RXRivalzAgent(Agent):
             model='gpt-4o',
             messages=[
             {"role": "system", "content": "Provide output in valid JSON format. The data should be like this ." +json.dumps({"keywords": ["keyword1", "keyword2", "keyword3"]})},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
+            
         ],
             response_format={"type":"json_object"},
             max_tokens=100,
             temperature=1.0,
+            timeout=20,
         ).choices[0].message.content
         try:
             index  = random.randint(0,9)

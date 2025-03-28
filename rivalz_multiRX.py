@@ -23,7 +23,7 @@ async def update_task_stats(session_id:str):
         while polling_active:
             try:
                 # Gọi API để lấy thống kê task
-                Logger.info(f"Fetching task stats...")
+                Logger.info(f"Fetching task stats... for session: {session_id}")
                 stat_url = RIVALZ_URL + f"/agent/task/rx/stats?authen_key={auth_key}&thread_id={session_id}"
                 async with session.get(stat_url) as response:
                     response_text = await response.text()

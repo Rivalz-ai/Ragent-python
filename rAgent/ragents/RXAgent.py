@@ -226,7 +226,8 @@ class RXAgent(Agent):
                 "temperature": self.inference_config.get('temperature'),
                 "top_p": self.inference_config.get('topP'),
                 "stop": self.inference_config.get('stopSequences'),
-                "stream": self.streaming
+                "stream": self.streaming,
+                "timeout":20,
             }
 
             # Add tools configuration if available
