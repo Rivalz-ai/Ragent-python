@@ -1,0 +1,175 @@
+2025-03-31 16:31:34,598 - INFO - Logging configured to file: logs/ragent_20250331_163134.log
+2025-03-31 16:31:37,976 - INFO - ℹ️  INFO - New chat session starting
+2025-03-31 16:31:37,977 - INFO - ℹ️  INFO - Created user_id: 2af1ea8e-3508-46bb-9d4b-9f1e7d559a7b, session_id: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:31:37,977 - INFO - ℹ️  INFO - Forced token refresh for RX Supervisor on session start
+2025-03-31 16:31:37,981 - INFO - ℹ️  INFO - Chat session started successfully
+2025-03-31 16:31:37,988 - INFO - ℹ️  INFO - Initialized sidebar with empty progress bar
+2025-03-31 16:31:37,988 - INFO - ℹ️  INFO - Started background task for updating task statistics
+2025-03-31 16:31:37,989 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:31:38,408 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:31:38,568 - INFO - ℹ️  INFO - New chat session starting
+2025-03-31 16:31:38,569 - INFO - ℹ️  INFO - Created user_id: f46c1198-2be6-496b-a1ca-8b9c25c3fe2e, session_id: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:31:38,569 - INFO - ℹ️  INFO - Forced token refresh for RX Supervisor on session start
+2025-03-31 16:31:38,572 - INFO - ℹ️  INFO - Chat session started successfully
+2025-03-31 16:31:38,578 - INFO - ℹ️  INFO - Initialized sidebar with empty progress bar
+2025-03-31 16:31:38,579 - INFO - ℹ️  INFO - Started background task for updating task statistics
+2025-03-31 16:31:38,580 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:31:38,761 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:31:45,448 - INFO - ℹ️  INFO - Processing message for user: 2af1ea8e-3508-46bb-9d4b-9f1e7d559a7b, session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:31:46,520 - INFO - INFO - 
+** CLASSIFIED INTENT **
+2025-03-31 16:31:46,521 - INFO - =======================
+2025-03-31 16:31:46,521 - INFO - ℹ️  INFO - > Text: hello can you post to X
+2025-03-31 16:31:46,521 - INFO - ℹ️  INFO - > Selected Agent: SupervisorAgent
+2025-03-31 16:31:46,521 - INFO - ℹ️  INFO - > Confidence: 0.90
+2025-03-31 16:31:46,521 - INFO - ℹ️  INFO - 
+2025-03-31 16:31:46,521 - INFO - INFO - 
+** AGENT SUPERVISORAGENT CHAT HISTORY **
+2025-03-31 16:31:46,521 - INFO - ========================================
+2025-03-31 16:31:46,521 - INFO - > - None -
+2025-03-31 16:31:46,521 - INFO - 
+2025-03-31 16:31:47,393 - INFO - ℹ️  INFO - Number of agents: 0, Content: NO, Task: post to X
+2025-03-31 16:31:47,394 - INFO - INFO - 
+** EXECUTION TIMES **
+2025-03-31 16:31:47,394 - INFO - =====================
+2025-03-31 16:31:47,394 - INFO - > Classifying user intent: 1.037254810333252s
+2025-03-31 16:31:47,394 - INFO - > Agent SupervisorAgent | Processing request: 0.872607946395874s
+2025-03-31 16:31:47,394 - INFO - 
+2025-03-31 16:31:47,394 - INFO - ℹ️  INFO - Received response from orchestrator for user: 2af1ea8e-3508-46bb-9d4b-9f1e7d559a7b
+2025-03-31 16:31:47,394 - INFO - ℹ️  INFO - No agent messages found, sending full response
+2025-03-31 16:31:47,397 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:31:47,397 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:31:47,398 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:31:47,398 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:31:47,474 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:31:47,475 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:31:54,476 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:31:54,477 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:31:54,478 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:31:54,478 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:31:54,552 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:31:54,553 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:32:01,557 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:01,557 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:32:01,558 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:01,558 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:32:01,637 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:32:01,641 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:32:08,640 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:08,641 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:32:08,643 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:08,644 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:32:08,730 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:32:08,733 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:32:15,735 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:15,736 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:32:15,741 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:15,742 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:32:15,823 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:32:15,829 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:32:18,516 - INFO - ℹ️  INFO - Processing message for user: 2af1ea8e-3508-46bb-9d4b-9f1e7d559a7b, session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:32:19,993 - INFO - INFO - 
+** CLASSIFIED INTENT **
+2025-03-31 16:32:19,993 - INFO - =======================
+2025-03-31 16:32:19,993 - INFO - ℹ️  INFO - > Text: post 1 post to X:
+rivalz a new company on blockchain, and AI agents
+2025-03-31 16:32:19,993 - INFO - ℹ️  INFO - > Selected Agent: SupervisorAgent
+2025-03-31 16:32:19,993 - INFO - ℹ️  INFO - > Confidence: 0.95
+2025-03-31 16:32:19,993 - INFO - ℹ️  INFO - 
+2025-03-31 16:32:19,993 - INFO - INFO - 
+** AGENT SUPERVISORAGENT CHAT HISTORY **
+2025-03-31 16:32:19,993 - INFO - ========================================
+2025-03-31 16:32:19,993 - INFO - > 1. USER: hello can you post to X
+2025-03-31 16:32:19,994 - INFO - > 2. ASSISTANT: [supervisoragent] You must provide the number of agents and topic/content to pro...
+2025-03-31 16:32:19,994 - INFO - 
+2025-03-31 16:32:21,886 - INFO - ℹ️  INFO - Number of agents: 1, Content: rivalz a new company on blockchain, and AI agents, Task: post to X
+2025-03-31 16:32:21,887 - INFO - ℹ️  INFO - Doing the true select agent
+2025-03-31 16:32:22,090 - INFO - ℹ️  INFO - Created RX_Agent_1 with access token
+2025-03-31 16:32:22,090 - INFO - ℹ️  INFO - Successfully created RX team with 1 agents
+2025-03-31 16:32:22,090 - INFO - ℹ️  INFO - [32m
+===>>>>> Supervisor sending RX_Agent_1499063740481908738: Do the post to X with rivalz a new company on blockchain, and AI agents[0m
+2025-03-31 16:32:22,092 - INFO - ℹ️  INFO - Retrieved 2 global history messages from additional_params
+2025-03-31 16:32:22,092 - INFO - ℹ️  INFO - Calling tool use for the 1 times
+2025-03-31 16:32:22,853 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:22,853 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:32:22,854 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:22,854 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:32:22,934 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:32:22,937 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:32:23,809 - INFO - ℹ️  INFO - Response: ('tool_calls', None, [ChatCompletionMessageToolCall(id='call_7DI2KeobbqqMIC2alUmsW80g', function=Function(arguments='{"tweet_text":"Exciting news! 🚀 Introducing Rivalz, a groundbreaking company at the intersection of blockchain and AI agents. Stay tuned for innovative solutions and cutting-edge technology. #Blockchain #AI #Innovation #Rivalz"}', name='tweet_to_queue'), type='function')])
+2025-03-31 16:32:23,809 - INFO - ℹ️  INFO - Processing tool 'tweet_to_queue' with input: {'tweet_text': 'Exciting news! 🚀 Introducing Rivalz, a groundbreaking company at the intersection of blockchain and AI agents. Stay tuned for innovative solutions and cutting-edge technology. #Blockchain #AI #Innovation #Rivalz'}
+2025-03-31 16:32:25,389 - INFO - ℹ️  INFO - Posting to https://staging-rome-api-v2.rivalz.ai/agent/task?authen_key=1QpEY53il71ZyiHKH with payload: {"type": 3, "session_id": "55b2a405-e14d-443c-8cd7-cf1be3ead2c7", "data": {"content": "\ud83c\udf1f Big announcement! Meet Rivalz, a pioneering company merging blockchain and AI for revolutionary solutions. \ud83d\ude80 Get ready for state-of-the-art tech and groundbreaking innovations. Keep an eye on what\u2019s coming next! #Blockchain #AI #TechInnovation #Rivalz \ud83d\ude0e\ud83d\udca1", "x_id": "1499063740481908738"}}
+2025-03-31 16:32:25,559 - INFO - ℹ️  INFO - Tool response: [{'role': 'function', 'name': 'tweet_to_queue', 'tool_call_id': 'call_7DI2KeobbqqMIC2alUmsW80g', 'content': 'ADDED to Queues with ID 67ea612986e0735a64e7c619. You can check its status in the sidebar.'}]
+2025-03-31 16:32:25,559 - INFO - ℹ️  INFO - Calling tool use for the 2 times
+2025-03-31 16:32:27,030 - INFO - ℹ️  INFO - Response: ('stop', 'The tweet about "Rivalz, a new company on blockchain and AI agents," has been successfully added to the queue with the ID 67ea612986e0735a64e7c619. You can check its status in the sidebar.', None)
+2025-03-31 16:32:27,031 - INFO - ℹ️  INFO - [33m
+<<<<<===Supervisor received from RX_Agent_1499063740481908738:
+<\startagent>[RX_Agent_1499063740481908738] The tweet about "Rivalz, a new company on blockchain and AI agents," has been successfully added to the queue with the ID 67ea612986e0735a64e7c619. You can check its status in the sidebar.<\endagent>...[0m
+2025-03-31 16:32:28,241 - INFO - INFO - 
+** EXECUTION TIMES **
+2025-03-31 16:32:28,241 - INFO - =====================
+2025-03-31 16:32:28,241 - INFO - > Classifying user intent: 1.4600870609283447s
+2025-03-31 16:32:28,242 - INFO - > Agent SupervisorAgent | Processing request: 8.247366905212402s
+2025-03-31 16:32:28,242 - INFO - 
+2025-03-31 16:32:28,242 - INFO - ℹ️  INFO - Received response from orchestrator for user: 2af1ea8e-3508-46bb-9d4b-9f1e7d559a7b
+2025-03-31 16:32:28,242 - INFO - ℹ️  INFO - Found 2 agent message(s) to process
+2025-03-31 16:32:29,949 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:29,949 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:32:29,950 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:29,951 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:32:30,027 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:32:30,034 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":1,"queue_size":100,"total_tasks":1}}
+2025-03-31 16:32:37,032 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:37,032 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:32:37,044 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:37,044 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:32:37,112 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:32:37,123 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":1,"queue_size":100,"total_tasks":1}}
+2025-03-31 16:32:44,119 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:44,119 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:32:44,129 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:44,130 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:32:44,202 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:32:44,218 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":1,"queue_size":100,"total_tasks":1}}
+2025-03-31 16:32:51,206 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:51,209 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:32:51,224 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:51,224 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:32:51,293 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:32:51,298 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":1,"queue_size":100,"total_tasks":1}}
+2025-03-31 16:32:58,298 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:58,300 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:32:58,302 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:32:58,302 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:32:58,374 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:32:58,380 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":1,"queue_size":100,"total_tasks":1}}
+2025-03-31 16:33:05,378 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:33:05,379 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:33:05,387 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:33:05,388 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:33:05,455 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:33:05,464 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":1,"queue_size":100,"total_tasks":1}}
+2025-03-31 16:33:12,460 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:33:12,460 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:33:12,466 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:33:12,467 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:33:12,543 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:33:12,545 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":1,"queue_size":100,"total_tasks":1}}
+2025-03-31 16:33:19,548 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:33:19,550 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:33:19,552 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:33:19,553 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:33:19,636 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:33:19,639 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":1,"queue_size":100,"total_tasks":1}}
+2025-03-31 16:33:26,645 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:33:26,645 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:33:26,647 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:33:26,647 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:33:26,721 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:33:26,728 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":1,"queue_size":100,"total_tasks":1}}
+2025-03-31 16:33:33,725 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:33:33,725 - INFO - ℹ️  INFO - Fetching task stats... for session: ab8ad6ec-ca49-4b00-963d-b3920a2075a6
+2025-03-31 16:33:33,731 - INFO - ℹ️  INFO - Updated task stats
+2025-03-31 16:33:33,731 - INFO - ℹ️  INFO - Fetching task stats... for session: 55b2a405-e14d-443c-8cd7-cf1be3ead2c7
+2025-03-31 16:33:33,801 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":0,"queue_size":100,"total_tasks":0}}
+2025-03-31 16:33:33,808 - INFO - ℹ️  INFO - Received task stats response: {"code":0,"data":{"completion_percentage":0,"done":0,"failed":0,"list_failed":[],"list_result_done":[],"pending":1,"queue_size":100,"total_tasks":1}}

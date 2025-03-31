@@ -511,10 +511,8 @@ class RXRivalzAgent(Agent):
                 "type": 3,
                 "session_id": self.session_id,  # Session ID for thread tracking
                 "data": {
-                    "posts": [{
                         "content": content,
                         "x_id": str(self.x_id)
-                    }]
                 }
             }
             authen_key = self.project_auth_token  # Replace <key> with the actual authentication key

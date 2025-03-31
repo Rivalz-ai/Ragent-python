@@ -11,6 +11,7 @@ import asyncio
 import requests
 import aiohttp
 import os
+from rAgent.utils import Logger
 import logging
 # Other imports...
 
@@ -43,8 +44,8 @@ async def update_task_stats(session_id:str):
                 
                 # Transform tweet IDs into full Twitter URLs
                 completed_links = []
-                for tweet_id in stats["list_result_done"]:
-                    completed_links.append(f"https://twitter.com/i/web/status/{tweet_id}")
+                for tweet_info in stats["list_result_done"]:
+                    completed_links.append(f"https://twitter.com/i/web/status/{tweet_info['data']}")
                 
                 # Cập nhật sidebar với progress bar
                 await cl.ElementSidebar.set_elements([
