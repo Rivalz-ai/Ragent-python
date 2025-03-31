@@ -28,4 +28,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
 
 # Command to run the application
-CMD ["chainlit", "run", "main_rx_system.py", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["chainlit", "run", "rivalz_multiRX.py", "--host", "0.0.0.0", "--port", "8000"]

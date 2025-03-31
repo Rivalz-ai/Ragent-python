@@ -11,6 +11,11 @@ import asyncio
 import requests
 import aiohttp
 import os
+import logging
+# Other imports...
+
+# Set up logging to both file and console
+log_file = Logger.setup_file_logging(log_level=logging.INFO)
 
 RIVALZ_URL = os.getenv("RIVAL_URL")
 auth_key = os.getenv("auth_key")
@@ -62,7 +67,7 @@ async def update_task_stats(session_id:str):
                     ])
                 
                 # Chờ 5 giây trước khi cập nhật lại
-                await asyncio.sleep(7)
+                await asyncio.sleep(60)
                 Logger.info("Updated task stats")
             except Exception as e:
                 Logger.error(f"Error updating task stats: {e}")
