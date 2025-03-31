@@ -45,7 +45,9 @@ async def update_task_stats(session_id:str):
                 # Transform tweet IDs into full Twitter URLs
                 completed_links = []
                 for tweet_info in stats["list_result_done"]:
-                    completed_links.append(tweet_info)
+                    if tweet_info["data"] is None:
+                        tweet_info["data"] = "0"
+                    completed_links.append(f"https://twitter.com/i/web/status/{tweet_info['data']}")
                 
                 # Cập nhật sidebar với progress bar
                 await cl.ElementSidebar.set_elements([
