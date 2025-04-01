@@ -8,4 +8,4 @@ rAgent/ragents/__pycache__/*
 rAgent/ragents/.DS_Store
 rAgent/ragents/.files/*
 rAgent/ragents/.venv/*
-.logs/*
+logs/*

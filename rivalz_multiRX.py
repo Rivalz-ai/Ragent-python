@@ -23,56 +23,113 @@ auth_key = os.getenv("auth_key")
 # Flag để kiểm soát background task
 polling_active = True
 
+async def updating_task_stats(session_id:str):
+    async with aiohttp.ClientSession() as session:
+        try:
+            # Gọi API để lấy thống kê task
+            Logger.info(f"Fetching task stats... for session: {session_id}")
+            stat_url = RIVALZ_URL + f"/agent/task/rx/stats?authen_key={auth_key}&thread_id={session_id}"
+            async with session.get(stat_url) as response:
+                response_text = await response.text()
+                Logger.info(f"Received task stats response: {response_text}")
+                stats = await response.json()
+                stats = stats["data"]
+            # Tính toán giá trị progress
+            value = int(stats["completion_percentage"])
+
+            # Prepare list_failed (handle null case)
+            list_failed = stats.get("list_failed", []) or []
+            
+            # Transform tweet IDs into full Twitter URLs
+            completed_links = []
+            for tweet_info in stats["list_result_done"]:
+                if tweet_info["data"] is None:
+                    tweet_info["data"] = "0"
+                completed_links.append(f"https://twitter.com/i/web/status/{tweet_info['data']}")
+            
+            # Cập nhật sidebar với progress bar
+            await cl.ElementSidebar.set_elements([
+                cl.CustomElement(
+                    name="CustomProgressBar", 
+                    props={
+                    "value": value,  
+                    "title": "RX Post Tasks",                
+                    "progressName": f"Posted {stats['done']}/{stats['total_tasks']}",
+                    "details": {                            
+                        "total": stats["total_tasks"],
+                        "done": stats["done"],
+                        "failed": stats["failed"], 
+                        "pending": stats["pending"]
+                    },
+                    "completedLinks": completed_links,
+                    "list_failed": list_failed  
+                    }
+                ),
+                ])
+        except Exception as e:
+            Logger.error(f"Error updating task stats: {e}")
+
 async def update_task_stats(session_id:str):
     """Background task để cập nhật thống kê task trên sidebar"""
-    async with aiohttp.ClientSession() as session:
-        while polling_active:
-            try:
-                # Gọi API để lấy thống kê task
-                Logger.info(f"Fetching task stats... for session: {session_id}")
-                stat_url = RIVALZ_URL + f"/agent/task/rx/stats?authen_key={auth_key}&thread_id={session_id}"
-                async with session.get(stat_url) as response:
-                    response_text = await response.text()
-                    Logger.info(f"Received task stats response: {response_text}")
-                    stats = await response.json()
-                    stats = stats["data"]
-                # Tính toán giá trị progress
-                value = int(stats["completion_percentage"])
+    global polling_active
+    while polling_active:
+        try:
+            # Gọi hàm cập nhật thống kê task
+            await updating_task_stats(session_id)
+            Logger.info("Updated task stats")
+        except Exception as e:
+            Logger.error(f"Error in background task: {e}")
+        await asyncio.sleep(60)
+    # async with aiohttp.ClientSession() as session:
+    #     while polling_active:
+    #         try:
+    #             # Gọi API để lấy thống kê task
+    #             Logger.info(f"Fetching task stats... for session: {session_id}")
+    #             stat_url = RIVALZ_URL + f"/agent/task/rx/stats?authen_key={auth_key}&thread_id={session_id}"
+    #             async with session.get(stat_url) as response:
+    #                 response_text = await response.text()
+    #                 Logger.info(f"Received task stats response: {response_text}")
+    #                 stats = await response.json()
+    #                 stats = stats["data"]
+    #             # Tính toán giá trị progress
+    #             value = int(stats["completion_percentage"])
 
-                # Prepare list_failed (handle null case)
-                list_failed = stats.get("list_failed", []) or []
+    #             # Prepare list_failed (handle null case)
+    #             list_failed = stats.get("list_failed", []) or []
                 
-                # Transform tweet IDs into full Twitter URLs
-                completed_links = []
-                for tweet_info in stats["list_result_done"]:
-                    completed_links.append(tweet_info)
+    #             # Transform tweet IDs into full Twitter URLs
+    #             completed_links = []
+    #             for tweet_info in stats["list_result_done"]:
+    #                 if tweet_info["data"] is None:
+    #                     tweet_info["data"] = "0"
+    #                 completed_links.append(f"https://twitter.com/i/web/status/{tweet_info['data']}")
                 
-                # Cập nhật sidebar với progress bar
-                await cl.ElementSidebar.set_elements([
-                    cl.CustomElement(
-                        name="CustomProgressBar", 
-                        props={
-                        "value": value,  
-                        "title": "RX Post Tasks",                
-                        "progressName": f"Posted {stats['done']}/{stats['total_tasks']}",
-                        "details": {                            
-                            "total": stats["total_tasks"],
-                            "done": stats["done"],
-                            "failed": stats["failed"], 
-                            "pending": stats["pending"]
-                        },
-                        "completedLinks": completed_links,
-                        "list_failed": list_failed  
-                        }
-                    ),
-                    ])
+    #             # Cập nhật sidebar với progress bar
+    #             await cl.ElementSidebar.set_elements([
+    #                 cl.CustomElement(
+    #                     name="CustomProgressBar", 
+    #                     props={
+    #                     "value": value,  
+    #                     "title": "RX Post Tasks",                
+    #                     "progressName": f"Posted {stats['done']}/{stats['total_tasks']}",
+    #                     "details": {                            
+    #                         "total": stats["total_tasks"],
+    #                         "done": stats["done"],
+    #                         "failed": stats["failed"], 
+    #                         "pending": stats["pending"]
+    #                     },
+    #                     "completedLinks": completed_links,
+    #                     "list_failed": list_failed  
+    #                     }
+    #                 ),
+    #                 ])
                 
-                # Chờ 5 giây trước khi cập nhật lại
-                await asyncio.sleep(7)
-                Logger.info("Updated task stats")
-            except Exception as e:
-                Logger.error(f"Error updating task stats: {e}")
-                await asyncio.sleep(10)  # Chờ lâu hơn khi có lỗi
+    #             # Chờ 5 giây trước khi cập nhật lại
+    #             await asyncio.sleep(60)
+    #             Logger.info("Updated task stats")
+    #         except Exception as e:
+    #             Logger.error(f"Error updating task stats: {e}")
+    #             await asyncio.sleep(10)  # Chờ lâu hơn khi có lỗi
 
 
 
@@ -177,7 +234,7 @@ async def main(message: cl.Message):
                 msg.author = author
                 await msg.stream_token(cleaned_text)
                 await msg.update() # Finalize the message
-
+        asyncio.create_task(updating_task_stats(user_id))
     except Exception as e:
         Logger.error(f"Error processing message: {e}")
         await msg.stream_token("An error occurred while processing your request. Please try again later.")
