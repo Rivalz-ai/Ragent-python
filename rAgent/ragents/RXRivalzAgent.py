@@ -17,6 +17,7 @@ from rAgent.types import AgentProviderType
 from rAgent.ragents.x_tool import post_tweet, post_reply_tweet, split_post
 import requests
 import os
+import random as rd
 @dataclass
 class RXAgentRivalzOptions(AgentOptions):
     api_key: str = None
@@ -478,22 +479,57 @@ class RXRivalzAgent(Agent):
         description = self.description
         example_post = self.example_post
 
-        number_words = random.randint(50, 280)
+        number_words = random.randint(10, 45)
         response = self.client.chat.completions.create(
             model='gpt-4o',
             messages=[
-            {"role": "system", "content": f"""
-            You are a {description} with the following persona: {persona}. You have an example post that reads: {example_post}.
-            """
+            {
+                "role": "system",
+                "content": (
+                f"You are a {description} with the following persona: {persona}. "
+                f"You have an example post that reads: {example_post}."
+                )
             },
-            {"role": "user", "content": f"""Provide a paraphrased version or generate a new POST with {number_words} words of the following content or topic: \n\n\"\"\"{content}\"\"\""""}
+            {
+                "role": "user",
+                "content": (
+                f"Provide a paraphrased version or generate a new POST with {number_words} words "
+                f"in 2-5 sentences, STRICTLY LIMITED TO UNDER 280 CHARACTERS, "
+                f"based on the following content or topic:\n\n\"\"\"{content}\"\"\""
+                )
+            }
             ],
-            max_tokens=512,
-            temperature=0.9,
+            max_tokens=int(rd.randint(50, 90)),
+            temperature=rd.uniform(0.5,1.0),
+        ).choices[0].message.content
+        if len(response) > 280:
+            return self.client.chat.completions.create(
+                model='gpt-4o',
+                messages=[
+                {
+                    "role": "system",
+                    "content": (
+                    f"You are a {description} with the following persona: {persona}. "
+                    f"You have an example post that reads: {example_post}."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": (
+                    f"Provide a paraphrased version or generate a new POST with {number_words} words "
+                    f"in 2-5 sentences, STRICTLY LIMITED TO UNDER 280 CHARACTERS, "
+                    f"based on the following content or topic:\n\n\"\"\"{content}\"\"\""
+                    )
+                },
+                {"role": "assistant", "content": response},
+                {"role": "user", "content": f"Please shorten the above content to be strickily under 280 character!."}
+                ],
+            max_tokens=int(rd.randint(20, 60)),
+            temperature=rd.uniform(0.5,1.0),
             timeout=20,
         ).choices[0].message.content
-        return response
-
+        else:
+            return response
     ## help function
     def post_to_X(self,tweet_text:str) -> str:
         """
