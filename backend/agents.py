@@ -154,11 +154,12 @@ def create_X_agent():
         )
     return RXAgent(options)
 
-def create_rx_supervisor(storage = None, num_agents=99):
+def create_rx_supervisor(storage = None, num_agents=99, project_id=None):
     lead_agent = OpenAIAgent(OpenAIAgentOptions(
         api_key=OPENAI_API_KEY,
         name="SupervisorAgent",
-        description="You a supervisor agent specialized in coordinating X_Agents for social media management (on X). Your role is to orchestrate and oversee the posting and replying activities on Twitter/X platform. You delegate tasks to X_Agents, monitor their performance, and ensure all social media interactions are executed efficiently. You coordinate when and how tweets should be posted or replied to, maintaining a strategic approach to social media engagement.",
+        description=("You a supervisor agent specialized in coordinating X_Agents for social media management (on X). Your role is to orchestrate and oversee the posting and replying activities on Twitter/X platform. You delegate tasks to X_Agents, monitor their performance, and ensure all social media interactions are executed efficiently."
+                     " You coordinate when and how tweets should be posted or replied to, maintaining a strategic approach to social media engagement."),
         model=OPENAI_MODEL,
         # base_url=DEEP_INFRA_URL,
         inference_config={
@@ -178,6 +179,7 @@ def create_rx_supervisor(storage = None, num_agents=99):
             lead_agent=lead_agent,  # Your configured lead agent
             authen_key=auth_key,
             api_url=RIVALZ_API_URL,
+            project_id=project_id,
             trace=True,
             storage = storage,
             callbacks=ChainlitAgentCallbacks(),

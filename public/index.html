@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500&display=swap" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Swarm Staking</title>
+  <style>
+    @font-face {
+      font-family: 'CeraPro';
+      src: url('https://rome.rivalz.ai/fonts/CeraPro-Regular.woff2') format('woff');
+      font-weight: normal;
+      font-style: normal;
+    }
+    body, h1, table, button, .pagination, .chat-btn, .status, select {
+      font-family: 'CeraPro', sans-serif;
+    }
+    body {
+      background-color: #0f1115;
+      color: #fafafa;
+      margin: 0;
+    }
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background-color: #13161B;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid #23262E;
+    }
+    .navbar .logo-link {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+    }
+    .navbar .logo {
+      height: 32px;
+    }
+    .navbar .title {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #d0d0d0;
+      margin: 0;
+    }
+    .container {
+      padding: 2rem;
+    }
+    .loading {
+      text-align: center;
+      margin: 1rem 0;
+      display: none;
+    }
+    .table-wrapper {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    thead tr {
+      background-color: #13161B;
+    }
+    thead th {
+      padding: 1rem;
+      text-align: left;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #717680;
+    }
+    tbody td {
+      padding: 1rem;
+      border-bottom: 1px solid #23262E;
+      vertical-align: middle;
+    }
+    tbody tr:hover {
+      background-color: #1a1d23;
+    }
+    tbody tr.inactive {
+      background-color: #1e1e1e;
+    }
+    .agent-name {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .agent-name img {
+      width: 24px;
+      height: 24px;
+    }
+    .status {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      border-radius: 9px;
+      border: 1px solid #373A40;
+      color: #CECFD2;
+    }
+    .chat-btn {
+      background: transparent;
+      color: #3BB25D;
+      border: 1px solid #2D7D44;
+      border-radius: 10px;
+      padding: 6px 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .chat-btn:hover {
+      color: #3BB25Dcc;
+      border-color: #3BB25Dcc;
+    }
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 1.5rem;
+      gap: 10px;
+    }
+    .pagination button {
+      padding: 0.5rem 1rem;
+      background-color: #1f1f1f;
+      border: 1px solid #3a3a3a; transition: border 0.2s ease;
+      color: #fafafa;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .pagination button:hover {
+      background-color: #2a2a2a;
+    }
+    .pagination .page-info {
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+    .page-size-select {
+      margin-left: 20px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: #1f1f1f;
+      color: #fafafa;
+      border: 1px solid #3a3a3a;
+    }
+    @media (max-width: 768px) {
+      .hide-mobile {
+        display: none;
+      }
+    }
+    input[type="text"]:hover,
+    input[type="text"]:focus,
+    input[type="text"]:focus-visible,
+    select:hover,
+    select:focus,
+    select:focus-visible {
+      border-color: #3BB25D;
+      box-shadow: 0 0 0 2px rgba(59, 178, 93, 0.5);
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a href="https://rome.rivalz.ai/" class="logo-link">
+      <img src="https://rome.rivalz.ai/logo-v1.svg" alt="ROME Logo" class="logo">
+    </a>
+    <h1 class="title">Swarm Staking</h1>
+  </nav>
+
+  <div class="container">
+    <div style="margin-bottom: 1rem; display: flex; gap: 1rem; align-items: center;">
+      <input type="text" id="searchInput" style="padding: 6px 12px; border-radius: 6px; background-color: #1f1f1f; color: #fafafa; border: 1px solid #3a3a3a;">
+      <datalist id="projectSuggestions"></datalist>
+      <select id="statusFilter" style="padding: 6px 12px; border-radius: 6px; background-color: #1f1f1f; color: #fafafa; border: 1px solid #3a3a3a;">
+        <option value="all">All Status</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+      </select>
+    </div>
+    <div class="table-wrapper">
+      <div class="loading" id="loading">Loading...</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th class="hide-mobile">Type</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="projectTableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="pagination" id="paginationControls" style="display:none">
+      <button id="prevPageBtn">Previous</button>
+      <span class="page-info" id="pageInfo"></span>
+      <button id="nextPageBtn">Next</button>
+      <select id="pageSizeSelect" class="page-size-select">
+        <option value="5">5</option>
+        <option value="10" selected>10</option>
+        <option value="20">20</option>
+        <option value="50">50</option>
+      </select>
+    </div>
+  </div>
+
+  <script>
+    let currentPage = 1;
+    let totalPages = 1;
+    let pageSize = 10;
+    const authenKey = "1QpEY53il71ZyiHKH";
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadProjects(currentPage);
+
+      document.getElementById('prevPageBtn').addEventListener('click', () => {
+        if (currentPage > 1) {
+          currentPage--;
+          loadProjects(currentPage);
+        }
+      });
+
+      document.getElementById('nextPageBtn').addEventListener('click', () => {
+        if (currentPage < totalPages) {
+          currentPage++;
+          loadProjects(currentPage);
+        }
+      });
+
+      document.getElementById('pageSizeSelect').addEventListener('change', (e) => {
+        pageSize = parseInt(e.target.value);
+        currentPage = 1;
+        loadProjects(currentPage);
+      });
+
+      document.getElementById('searchInput').addEventListener('input', () => loadProjects(1));
+      document.getElementById('statusFilter').addEventListener('change', () => loadProjects(1));
+    });
+
+    async function loadProjects(page) {
+      const searchText = document.getElementById("searchInput").value.toLowerCase();
+      const statusFilter = document.getElementById("statusFilter").value;
+      const tbody = document.getElementById("projectTableBody");
+      const paginationControls = document.getElementById("paginationControls");
+      const pageInfo = document.getElementById("pageInfo");
+      const loading = document.getElementById("loading");
+
+      tbody.innerHTML = "";
+      loading.style.display = "block";
+
+      const url = `/api_app/projects?authen_key=${authenKey}&page=${page}&page_size=${pageSize}`;
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`HTTP error! Status: ${res.status}`);
+        }
+
+        const data = await res.json();
+        const projects = data.data?.items || [];
+        const datalist = document.getElementById("projectSuggestions");
+        datalist.innerHTML = "";
+        projects.forEach(p => {
+          const opt = document.createElement("option");
+          opt.value = p.project_name;
+          datalist.appendChild(opt);
+        });
+        totalPages = data.data?.total_pages || 1;
+        currentPage = data.data?.page || 1;
+
+        if (projects.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="4">No projects found.</td></tr>`;
+          paginationControls.style.display = "none";
+          loading.style.display = "none";
+          return;
+        }
+
+        projects.forEach(project => {
+          const nameMatch = project.project_name.toLowerCase().includes(searchText);
+          const statusMatch = statusFilter === 'all' || (project.status || 'active').toLowerCase() === statusFilter;
+          if (!nameMatch || !statusMatch) return;
+          const tr = document.createElement("tr");
+          if ((project.status || '').toLowerCase() === 'inactive') {
+            tr.classList.add("inactive");
+          }
+          tr.innerHTML = `
+            <td>${project.project_name}</td>
+            <td class="hide-mobile">
+              <div class="agent-name">
+                <img src="https://rome.rivalz.ai/icons/rx.svg" alt="$RX" />
+                <span style="color: #FAFAFA; font-size: 14px; font-weight: 500; line-height: 20px; font-family: 'Poppins', sans-serif;" class="hidden md:block">$RX</span>
+              </div>
+            </td>
+            <td><span class="status">${project.status || 'inactive'}</span></td>
+            <td><button class="chat-btn" onclick="window.location.href='/chat/login?project_id=${project.project_id}&project_name=${project.project_name}'">Chat</button></td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        paginationControls.style.display = totalPages > 1 ? "flex" : "none";
+        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+      } catch (err) {
+        console.error("Error fetching or parsing projects:", err);
+        tbody.innerHTML = `<tr><td colspan="4">Error loading data.</td></tr>`;
+        paginationControls.style.display = "none";
+      } finally {
+        loading.style.display = "none";
+      }
+    }
+  </script>
+</body>
+</html>

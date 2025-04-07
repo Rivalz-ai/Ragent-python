@@ -1,7 +1,7 @@
 chainlit==2.3.0
 # multi_agent_orchestrator==0.1.2
 pydantic==2.10.1
-openai==1.63.0
+openai==1.67.0
 python-dotenv==1.0.1
 pytest
 coverage

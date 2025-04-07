@@ -10,9 +10,11 @@ from rAgent.ragents.x_tool import Xtools
 from datetime import datetime, timedelta
 import threading
 import asyncio
+import httpx
 @dataclass
 class RXTeamSupervisorRivalzOptions(SupervisorAgentOptions):
     authen_key: str =field(default="")
+    project_id: str = field(default="")
     api_url: str = "https://staging-rome-api-v2.rivalz.ai"
     token_refresh_minutes: int = 110
     number_of_agents: int = 3
@@ -21,6 +23,7 @@ class RXTeamSupervisorRivalzOptions(SupervisorAgentOptions):
 class RXTeamSupervisorRivalz(SupervisorAgent):
     def __init__(self, options: RXTeamSupervisorRivalzOptions):
         self.authen_key = options.authen_key
+        self.project_id = options.project_id
         self.api_url = options.api_url
         self.token_refresh_minutes = options.token_refresh_minutes
         self.last_refresh_time = None
@@ -33,10 +36,15 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
     def authenticate_and_create_team(self) -> None:
         """Fetch access tokens and create RX agent team"""
         try:
-            params = {'authen_key': self.authen_key}
+            params = {'authen_key': self.authen_key, 'project_id': self.project_id}
             api_url = f"{self.api_url}/agent/swarm"
-            Logger.info(f"Authenticating with RX API at {api_url}")
-            response = requests.get(api_url, params=params)
+            Logger.info(f"Authenticating with RX API at {api_url} with params: {params}")
+            try:
+                with httpx.Client(timeout=20) as client:
+                    response = client.get(api_url, params=params)
+            except httpx.RequestError as exc:
+                Logger.error(f"An error occurred while requesting {exc.request.url!r}: {exc}")
+                raise Exception("Request error")
             if response.status_code == 200:
                 data = response.json()
                 self._create_rx_team(data)
@@ -44,10 +52,11 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
                 self.last_refresh_time = datetime.now()
                 self._schedule_token_refresh()
             else:
-                raise ValueError(f"Authentication failed with status {response.status_code}")
+                Logger.warn(f"Not Authentication! team is None")
+                self.team = []
         except Exception as e:
             Logger.error(f"Authentication error: {str(e)}")
-            raise
+            raise E
 
     def _create_rx_team(self, auth_data: dict) -> None:
         """Create RX agents team from authentication data"""

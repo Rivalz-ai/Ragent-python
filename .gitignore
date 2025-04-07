@@ -9,3 +9,7 @@ rAgent/ragents/.DS_Store
 rAgent/ragents/.files/*
 rAgent/ragents/.venv/*
 logs/*
+cline_docs/*
+# Ignore all files in the .chainlit directory
+# except for the .gitkeep file
+# This will ensure that the .gitkeep file is tracked by Git
