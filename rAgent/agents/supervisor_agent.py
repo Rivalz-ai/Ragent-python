@@ -437,7 +437,7 @@ When communicating with other agents, including the User, please follow these gu
     
     def num_agent(self, chat_history, input_text):
         
-        messages = [{"role": "system", "content": "Extract the task what agent do and Decide number of member agents in team, and the information for member Agent doing task that lead agent should send the message to, if context not provided number or content for doing task, return " + json.dumps({"task":"the task","number": 0, "content":"NO"}) + "\n. Provide output in valid JSON format. The data should be like this ." + json.dumps({"task":"the task","number": "num_agents", "content":"the content for member agent doing task"}) + "CHECK ALL THE CHAT HISTORY TO CHOOSE **THE NUMBER OF AGENT** AND **CONTENT**"}] + [
+        messages = [{"role": "system", "content": "Extract the task what agent do and Decide number of member agents in team, and the information for member Agent doing task that lead agent should send the message to, if context not provided number or content for doing task, return " + json.dumps({"task":"the task","number": 0, "content":"NO"}) + "\n. Provide output in valid JSON format. The data should be like this ." + json.dumps({"task":"the task","number": "num_agents", "content":"the content for member agent doing task"}) + "CHECK ALL THE CHAT HISTORY TO CHOOSE **THE NUMBER OF AGENT** AND **CONTENT**. If the last 3 messages do not mention the number of agents explicitly, return 0 for the number of agents without inferring."}] + [
             {"role": "user" if msg.role == ParticipantRole.USER.value else "assistant",
              "content": msg.content[0]['text'] if msg.content else ''} for msg in chat_history
         ]

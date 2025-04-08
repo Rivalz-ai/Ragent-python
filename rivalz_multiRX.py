@@ -257,8 +257,8 @@ async def main(message: cl.Message):
     cl.user_session.set("current_msg", msg)
     try:
         response: AgentResponse = await orchestrator.route_request(message.content, user_id, session_id, {})
-        Logger.info(f"Received response from orchestrator for user: {user_id}")
-            
+        Logger.info(f"Received response from orchestrator for user: {user_id} is: {response.output.content[0].get('text', '')}")
+        
 
         # Handle non-streaming responses
         if isinstance(response, AgentResponse) and response.streaming is False:
@@ -270,7 +270,7 @@ async def main(message: cl.Message):
                 raw_output = response.output.content[0].get('text', '')
 
             # Extract messages between <\\startagent> and <\endagent>
-            extracted_texts = re.findall(r'<\startagent>(.*?)<\endagent>', raw_output, re.DOTALL)
+            extracted_texts = re.findall(r'<\\startagent>(.*?) <\\endagent>', raw_output, re.DOTALL)
             
             if extracted_texts:  
                 Logger.info(f"Found {len(extracted_texts)} agent message(s) to process")

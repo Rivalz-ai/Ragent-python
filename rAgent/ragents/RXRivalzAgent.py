@@ -43,6 +43,7 @@ class RXAgentRivalzOptions(AgentOptions):
     example_post: Optional[str] = None
     style_description: Optional[str] = None
     project_auth_token:str = None
+    project_id: str = None
     api_post: str = "https://staging-rome-api-v2.rivalz.ai/agent"
 class RXRivalzAgent(Agent):
 
@@ -88,6 +89,7 @@ class RXRivalzAgent(Agent):
         self.description = options.description or self.generate_description()
         self.project_auth_token = options.project_auth_token
         self.api_post = options.api_post
+        self.project_id = options.project_id
         # Default inference configuration
         default_inference_config = {
             'maxTokens': 1000,
@@ -111,7 +113,7 @@ class RXRivalzAgent(Agent):
             1.  ANALYZE THE ENTIRE CONVERSATION HISTORY across all agents to understand the full context
             2. Consider previous interactions the user has had with other agents (Health, Travel, etc.)
             3. Use this comprehensive history to create more relevant and personalized content
-        
+            4. Only post **1 TWEET** at A TIME
         ----
         
         You will engage in an open-ended conversation, providing helpful and accurate information based on your expertise.
@@ -310,7 +312,7 @@ class RXRivalzAgent(Agent):
                         tool_use = False
                     max_recursions -= 1
 
-                return ConversationMessage(role=ParticipantRole.ASSISTANT.value,  content=[{"text": f"<\startagent>[{self.name}] {final_message}<\endagent>"}])
+                return ConversationMessage(role=ParticipantRole.ASSISTANT.value,  content=[{"text": f"<\\startagent>[{self.name}] {final_message}<\\endagent>"}])
             else:
                 if self.streaming:
                     finish_reason, response, tool_use_blocks = await self.handle_streaming_response(request_options)
@@ -319,7 +321,7 @@ class RXRivalzAgent(Agent):
                 
                 return ConversationMessage(
                     role = ParticipantRole.ASSISTANT.value,
-                    content=[{"text": f"<\startagent>[{self.name}] {response}<\endagent>"}]
+                    content=[{"text": f"<\\startagent>[{self.name}] {response}<\\endagent>"}]
                 )
         except Exception as error:
             Logger.error(f"Error in OpenAI API call: {str(error)}")
@@ -546,6 +548,7 @@ class RXRivalzAgent(Agent):
             payload = {
                 "type": 3,
                 "session_id": self.session_id,  # Session ID for thread tracking
+                "project_id": self.project_id,
                 "data": {
                         "content": content,
                         "x_id": str(self.x_id)

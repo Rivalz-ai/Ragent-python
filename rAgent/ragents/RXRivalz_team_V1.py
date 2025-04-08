@@ -112,6 +112,7 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
                     style_description=style_description,
                     project_auth_token=project_auth_token,
                     api_post=api_post, 
+                    project_id=self.project_id,
                     inference_config={
                         'maxTokens': 500,
                         'temperature': 0.5,
@@ -196,7 +197,8 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
             url = self.api_url +"/agent/rx"
             params = {
                 'authen_key': self.authen_key,
-                'num': num_agents
+                'num': num_agents,
+                'project_id': self.project_id
             }
             response = requests.get(url, params=params)
             tempt_team = []
@@ -272,6 +274,7 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
                     style_description=style_description,
                     project_auth_token=project_auth_token,
                     api_post=api_post, 
+                    project_id=self.project_id,
                     inference_config={
                         'maxTokens': 500,
                         'temperature': 0.5,
