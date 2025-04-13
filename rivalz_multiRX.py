@@ -133,6 +133,18 @@ from urllib.parse import urlparse, parse_qs
 import chainlit as cl
 
 # User authentication callback
+# @cl.password_auth_callback
+# def auth_callback(project_name: str, project_id: str):
+#     # Fetch the user matching username from your database
+#     # and compare the hashed password with the value stored in the database
+#     payload = {'project_id': project_id, 'project_name':project_name }
+#     if project_name and project_id:
+#         return cl.User(
+#             identifier="project_name", metadata=payload
+#         )
+#     else:
+#         return None
+
 @cl.header_auth_callback
 async def header_auth_callback(headers: Dict) -> Optional[User]:
     user = None
@@ -169,6 +181,7 @@ async def header_auth_callback(headers: Dict) -> Optional[User]:
 async def start():
     # Get the project_id from the user session
     user = cl.user_session.get("user")
+    print(f"User: {user}")
     # Extract project info from user metadata
     project_id = None    
     if user and user.metadata:

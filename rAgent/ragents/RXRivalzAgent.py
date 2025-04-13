@@ -1,5 +1,5 @@
 from typing import Dict, List, Union, AsyncIterable, Optional, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from openai import OpenAI
 from rAgent.agents import Agent, AgentOptions
 from rAgent.types import (
@@ -14,38 +14,159 @@ from rAgent.utils import Logger
 from rAgent.retrievers import Retriever
 from rAgent.utils import AgentTool, AgentTools
 from rAgent.types import AgentProviderType
-from rAgent.ragents.x_tool import post_tweet, post_reply_tweet, split_post
 import requests
-import os
 import random as rd
+from abc import ABC, abstractmethod
+
+class SocialMediaClient(ABC):
+    """Abstract base class for social media platform clients."""
+    
+    @abstractmethod
+    def post_content(self, content: str, **kwargs) -> Dict[str, Any]:
+        """Post content to the social media platform."""
+        pass
+    
+    @abstractmethod
+    def refresh_token(self, **kwargs) -> Dict[str, Any]:
+        """Refresh authentication token for the platform."""
+        pass
+
+class XClient(SocialMediaClient):
+    """Client for X (formerly Twitter) platform."""
+    
+    def __init__(self, access_token: Optional[str] = None, 
+                 refresh_token: Optional[str] = None,
+                 client_id: Optional[str] = None, 
+                 client_secret: Optional[str] = None):
+        self.access_token = access_token
+        self.refresh_token = refresh_token
+        self.client_id = client_id
+        self.client_secret = client_secret
+    
+    def post_content(self, content: str, **kwargs) -> Dict[str, Any]:
+        """Post content to X platform using X API."""
+        # Implementation for direct X API posting would go here
+        # This is a placeholder as the current implementation uses a queue API
+        return {"status": "success", "id": "placeholder-id"}
+    
+    def refresh_token(self, **kwargs) -> Dict[str, Any]:
+        """Refresh X API OAuth 2.0 access token."""
+        if not self.refresh_token or not self.client_id:
+            raise ValueError("Refresh token and client ID are required")
+            
+        url = "https://api.twitter.com/2/oauth2/token"
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        
+        payload = {
+            "grant_type": "refresh_token",
+            "refresh_token": self.refresh_token,
+            "client_id": self.client_id
+        }
+        if self.client_secret:
+            payload["client_secret"] = self.client_secret
+
+        response = requests.post(url, headers=headers, data=payload)
+        
+        if response.status_code == 200:
+            data = response.json()
+            self.access_token = data.get("access_token")
+            if "refresh_token" in data:
+                self.refresh_token = data.get("refresh_token")
+            return data
+        else:       
+            raise Exception(f"Failed to refresh token: {response.status_code} - {response.text}")
+
+class RivalzQueueClient(SocialMediaClient):
+    """Client for Rivalz queue API."""
+    
+    def __init__(self, project_auth_token: Optional[str] = None,
+                 project_id: Optional[str] = None,
+                 api_base_url: str = "https://staging-rome-api-v2.rivalz.ai/agent",
+                 x_id: Optional[str] = None):
+        self.project_auth_token = project_auth_token
+        self.project_id = project_id
+        self.api_base_url = api_base_url
+        self.x_id = x_id
+        self.session_id = ""
+    
+    def set_session_id(self, session_id: str) -> None:
+        """Set the session ID for the client."""
+        self.session_id = session_id
+    
+    def post_content(self, content: str, **kwargs) -> Dict[str, Any]:
+        """Queue content for posting via the Rivalz API."""
+        if not self.session_id:
+            raise ValueError("Session ID is required")
+            
+        payload = {
+            "type": 3,
+            "session_id": self.session_id,
+            "project_id": self.project_id,
+            "data": {"content": content, "x_id": str(self.x_id)}
+        }
+        url_post_with_key = f"{self.api_base_url}/agent/task?authen_key={self.project_auth_token}"
+        Logger.info(f"Posting to {url_post_with_key} with payload: {json.dumps(payload)}")
+        
+        response = requests.post(url_post_with_key, json=payload)
+        response_data = response.json()
+        
+        if response.status_code != 200:
+            raise Exception(f"Error queueing post: {response_data.get('message')}")
+            
+        return response_data
+    
+    def refresh_token(self, **kwargs) -> Dict[str, Any]:
+        """Not implemented for queue client as it uses project auth token."""
+        return {"status": "not_applicable"}
+
 @dataclass
 class RXAgentRivalzOptions(AgentOptions):
+    """
+    Options for configuring the RXRivalzAgent.
+    """
+    # OpenAI configuration
     api_key: str = None
     base_url: str = None
     model: Optional[str] = None
     streaming: Optional[bool] = None
     inference_config: Optional[Dict[str, Any]] = None
+    
+    # Agent configuration
     custom_system_prompt: Optional[Dict[str, Any]] = None
     retriever: Optional[Retriever] = None
     client: Optional[Any] = None
     extra_tools: Optional[Union[AgentTools, list[AgentTool]]] = None
     default_max_recursions: int = 2
+    
+    # X API configuration
     xaccesstoken: Optional[str] = None
     xrefreshtoken: Optional[str] = None
     client_id: Optional[str] = None
-    client_secret : Optional[str] = None
-    
+    client_secret: Optional[str] = None
     x_id: str = None
+    
+    # Account metadata
     followers_count: Optional[int] = None
     following_count: Optional[int] = None
     tweet_count: Optional[int] = None
     like_count: Optional[int] = None
     example_post: Optional[str] = None
     style_description: Optional[str] = None
-    project_auth_token:str = None
+    
+    # Rivalz configuration
+    project_auth_token: str = None
     project_id: str = None
     api_post: str = "https://staging-rome-api-v2.rivalz.ai/agent"
+    
+    # Additional configuration fields with default values
+    prompt_templates: Dict[str, str] = field(default_factory=dict)
+    content_formatting: Dict[str, Any] = field(default_factory=dict)
+
 class RXRivalzAgent(Agent):
+    """
+    RXRivalzAgent is a specialized agent for interacting with X (formerly Twitter) accounts.
+    It queues posts to an external API and provides modular functionality for managing X accounts.
+    """
 
     PERSONALITY_TRAITS = {
         "personality": ["humorous", "serious", "enthusiastic", "skeptical", "optimistic", "calm", "witty", "sarcastic", "confident", "analytical", "empathetic"],
@@ -55,159 +176,297 @@ class RXRivalzAgent(Agent):
     }
 
     def __init__(self, options: RXAgentRivalzOptions):
+        """
+        Initialize the RXRivalzAgent with the provided options.
+        """
         super().__init__(options)
+        self._validate_options(options)
+        
+        # Initialize clients and configurations
+        self._initialize_llm_client(options)
+        self._initialize_social_media_clients(options)
+        self._initialize_agent_attributes(options)
+        self._initialize_inference_config(options)
+        self._initialize_tools(options.extra_tools)
+        self._initialize_prompt_template(options)
+        
+        # Set default content configuration
+        self.content_config = options.content_formatting or {
+            "max_chars": 280,
+            "min_words": 10,
+            "max_words": 45,
+            "temperature_range": (0.5, 1.0)
+        }
+
+    def _validate_options(self, options: RXAgentRivalzOptions) -> None:
+        """
+        Validate the required options for the agent.
+        """
         if not options.api_key:
             raise ValueError("OpenAI API key is required")
-        
-        if options.client:
-            self.client = options.client
-        else:
-            if options.base_url:
-                self.client = OpenAI(api_key=options.api_key,base_url=options.base_url)
-            else:
-                self.client = OpenAI(api_key=options.api_key)
 
+    def _initialize_llm_client(self, options: RXAgentRivalzOptions) -> None:
+        """
+        Initialize the OpenAI client based on the provided options.
+        """
+        self.client = options.client or OpenAI(api_key=options.api_key, base_url=options.base_url)
+
+    def _initialize_social_media_clients(self, options: RXAgentRivalzOptions) -> None:
+        """
+        Initialize social media clients for different platforms.
+        """
+        # X API client for direct interactions with X
+        self.x_client = XClient(
+            access_token=options.xaccesstoken,
+            refresh_token=options.xrefreshtoken,
+            client_id=options.client_id,
+            client_secret=options.client_secret
+        )
+        
+        # Rivalz Queue client for queueing posts
+        self.queue_client = RivalzQueueClient(
+            project_auth_token=options.project_auth_token,
+            project_id=options.project_id,
+            api_base_url=options.api_post,
+            x_id=options.x_id
+        )
+
+    def _initialize_agent_attributes(self, options: RXAgentRivalzOptions) -> None:
+        """
+        Initialize agent-specific attributes.
+        """
         self.base_url = options.base_url
         self.model = options.model or OPENAI_MODEL_ID_GPT_O_MINI
         self.streaming = options.streaming or False
-        self.retriever: Optional[Retriever] = options.retriever
+        self.retriever = options.retriever
         self.default_max_recursions = options.default_max_recursions
         self.session_id = ""
-
-        ## for rx verification
+        
+        # X account attributes
         self.xaccesstoken = options.xaccesstoken
-        self.xrefreshtoken = options.xrefreshtoken or None
-        self.client_id = options.client_id or None
-        self.client_secret = options.client_secret or None
-        self.x_id = options.x_id or None
-        self.followers_count = options.followers_count or None
-        self.following_count = options.following_count or None
-        self.tweet_count = options.tweet_count or None
-        self.like_count = options.like_count or None
-        self.example_post = options.example_post or None
+        self.xrefreshtoken = options.xrefreshtoken
+        self.client_id = options.client_id
+        self.client_secret = options.client_secret
+        self.x_id = options.x_id
+        
+        # Account metadata
+        self.followers_count = options.followers_count
+        self.following_count = options.following_count
+        self.tweet_count = options.tweet_count
+        self.like_count = options.like_count
+        self.example_post = options.example_post
+        
+        # Generate style and description if not provided
         self.style_description = options.style_description or self.create_random_persona()
         self.description = options.description or self.generate_description()
+        
+        # Rivalz specific attributes
         self.project_auth_token = options.project_auth_token
         self.api_post = options.api_post
         self.project_id = options.project_id
-        # Default inference configuration
+
+    def _initialize_inference_config(self, options: RXAgentRivalzOptions) -> None:
+        """
+        Initialize the inference configuration for the agent.
+        """
         default_inference_config = {
             'maxTokens': 1000,
             'temperature': 0.2,
             'topP': None,
             'stopSequences': None
         }
-        
+        self.inference_config = {**default_inference_config, **(options.inference_config or {})}
 
-        if options.inference_config:
-            self.inference_config = {**default_inference_config, **options.inference_config}
-        else:
-            self.inference_config = default_inference_config
-
-
-        # Initialize system prompt
-        self.prompt_template = f"""You are a {{name}}.
-        {{description}} Provide helpful and accurate information based on your expertise.
-        
-        When processing requests related to social media posts:
-            1.  ANALYZE THE ENTIRE CONVERSATION HISTORY across all agents to understand the full context
-            2. Consider previous interactions the user has had with other agents (Health, Travel, etc.)
-            3. Use this comprehensive history to create more relevant and personalized content
-            4. Only post **1 TWEET** at A TIME
-        ----
-        
-        You will engage in an open-ended conversation, providing helpful and accurate information based on your expertise.
-        The conversation will proceed as follows:
-            1. The human may ask an initial question or provide a prompt on any topic.
-            2. You will provide a relevant and informative response.
-            3. The human may then follow up with additional questions or prompts related to your previous response,
-          allowing for a multi-turn dialogue on that topic.
-            4. Or, the human may switch to a completely new and unrelated topic at any point.
-            5. You will seamlessly shift your focus to the new topic, providing thoughtful and coherent responses
-          based on your broad knowledge base.
-        
-        ----
-
-        Throughout the conversation, you should aim to:
-            1. Understand the context and intent behind each new question or prompt.
-            2. Provide substantive and well-reasoned responses that directly address the query.
-            3. Draw insights and connections from your extensive knowledge when appropriate.
-            4. Ask for clarification if any part of the question or prompt is ambiguous.
-            5. Maintain a consistent, respectful, and engaging tone tailored to the human's communication style.
-            6. Seamlessly transition between topics as the human introduces new subjects.
-        
-            
-        ----
-
-
-        When user asks for a TWEET, you should:
-            1 If user asks for a tweet, WITHOUT ANY CONTEXT, GLOBAL CONTEXT ONLY ABOUT GREETING you should **ASK** for more information.
-            2. However, if user asks for a tweet like Do the post about ..., you should **POST** the tweet with the paraphrased content.
-            3. If FULL CONVERSATION HISTORY have information for posting to tweet; Base your content on the FULL CONVERSATION HISTORY across all agents
-            4. Consider both direct conversations with you and conversations with other agents
-            5. Choose the most appropriate approach:
-                - Keep original content if it's clear and effective
-                - Enhance content based on your style and expertise
-                - Ask for clarification if necessary
-            6. Please DO NOT PROVIDE THE ACCESS TOKEN IN THE RESPONSE
-            7. If the tweet is queued to post, PROVIDE A RESPONSE with task_id.
-            8. If the tweet can not queued, PROVIDE A RESPONSE with the ORIGINAL ERROR (PLEASE DO NOT REWRITE IT) WITH YOUR SUGGESTION TO FIX BUG.
-        
-        ---
-
-        NOTE:    
-        GLOBAL CONVERSATION HISTORY IS PROVIDED SEPARATELY FROM YOUR DIRECT CONVERSATION HISTORY.
+    def _initialize_tools(self, extra_tools: Optional[Union[AgentTools, list[AgentTool]]]) -> None:
         """
-        self._configure_tools(options.extra_tools)
+        Configure tools for the agent.
+        """
+        post_X_tool = AgentTool(
+            name="tweet_to_queue",
+            description="Add a tweet to the posting queue for a specific account",
+            properties={
+                "tweet_text": {
+                    "type": "string",
+                    "description": "The content to be posted as a tweet",
+                },
+            },
+            func=self.post_to_X,
+        )
+        self.RX_tools = AgentTools(tools=[post_X_tool])
+        
+        if extra_tools:
+            self.RX_tools.tools.extend(extra_tools.tools if isinstance(extra_tools, AgentTools) else extra_tools)
+            
+        if self.RX_tools.tools:
+            self.tool_config = {'tool': self.RX_tools, 'toolMaxRecursions': 2}
+
+    def _initialize_prompt_template(self, options: RXAgentRivalzOptions) -> None:
+        """
+        Initialize the system prompt template for the agent.
+        """
+        # Default prompt template with better structure
+        default_template = """
+        # Role: {{name}}
+        
+        ## Agent Information
+        {{description}}
+        
+        ## Style and Personality
+        My writing style: {{style_description}}
+        
+        ## Platform Information
+        I'm a social media agent specialized for X (formerly Twitter), where content is limited to 280 characters.
+        
+        ## Instructions
+        - Provide concise, engaging responses suitable for X platform
+        - Maintain the assigned personality and tone
+        - Stay within character limits (280 characters)
+        - If asked to post something to X, I can use the tweet_to_queue tool
+
+        ## Examples
+        Sample post: {{example_post}}
+        
+        ## Guidelines
+        - Be helpful, accurate, and engaging
+        - Stay on-topic and provide valuable insights
+        - Use appropriate tone based on the conversation context
+        - Avoid sensitive topics unless directly relevant to the query
+        """
+        
+        # Use custom template if provided
+        self.prompt_template = options.prompt_templates.get('default', default_template)
         self.system_prompt = ""
-        self.custom_variables: TemplateVariables = {
+        
+        # Set up custom variables for template
+        self.custom_variables = {
             "name": self.name,
             "description": self.description,
+            "style_description": self.style_description,
+            "example_post": self.example_post or "Example post not provided",
             "xaccesstoken": self.xaccesstoken
         }
-
+        
+        # Override with custom prompt if provided
         if options.custom_system_prompt:
             self.set_system_prompt(
                 options.custom_system_prompt.get('template'),
                 options.custom_system_prompt.get('variables')
             )
 
+    def post_to_X(self, tweet_text: str) -> str:
+        """
+        Queue a tweet for posting via the external API.
 
+        Args:
+            tweet_text (str): The content of the tweet.
 
-    
-    def _configure_tools(self, extra_tools: Optional[Union[AgentTools, list[AgentTool]]]) -> None:
-        """Configure the tools available to the lead_agent."""
-                # Initialize tools
-        # Define the post_X_tool for queuing tweets
-        post_X_tool = AgentTool(
-            name="tweet_to_queue",
-            description="Add a tweet to the posting queue for a specific account",
-            properties = {
-            "tweet_text": {
-                "type": "string",
-                "description": "The content to be posted as a tweet",
-            },
-            },
-            func=self.post_to_X,
-        )
-        self.RX_tools = AgentTools(tools=[post_X_tool])
+        Returns:
+            str: A message indicating the result of the operation.
+        """
+        try:
+            # Set the current session ID to the queue client
+            self.queue_client.set_session_id(self.session_id)
+            
+            # Paraphrase the content for uniqueness
+            content = self.paraphrase(tweet_text)
+            
+            # Post to queue via the client
+            response_data = self.queue_client.post_content(content)
+            
+            # Extract job ID and return success message
+            job_id = response_data.get('data', {}).get('job_id')
+            return f"ADDED to Queues with ID {job_id}. You can check its status in the sidebar."
+        except Exception as e:
+            Logger.error(f"Error queueing post: {str(e)}")
+            return f"Error adding tweet to queue: {str(e)}"
 
-        if extra_tools:
-            if isinstance(extra_tools, AgentTools):
-                self.RX_tools.tools.extend(extra_tools.tools)
-            else:
-                self.RX_tools.tools.extend(extra_tools)
+    def paraphrase(self, content: str) -> str:
+        """
+        Generate a paraphrased version of the given content.
 
-        if len(self.RX_tools.tools) >0:
-            self.tool_config = {
-                'tool': self.RX_tools,
-                'toolMaxRecursions': 2,
-            }
+        Args:
+            content (str): The original content.
+
+        Returns:
+            str: The paraphrased content.
+        """
+        persona = self.style_description
+        description = self.description
+        example_post = self.example_post
         
+        # Generate random word count within configured range
+        number_words = random.randint(
+            self.content_config.get('min_words', 10),
+            self.content_config.get('max_words', 45)
+        )
+        
+        # Generate paraphrased content
+        response = self._generate_paraphrase(content, persona, description, example_post, number_words)
+        
+        # Check if response is within character limit, if not, shorten it
+        max_chars = self.content_config.get('max_chars', 280)
+        return response if len(response) <= max_chars else self._shorten_response(response, persona, description, example_post, max_chars)
+
+    def _generate_paraphrase(self, content: str, persona: str, description: str, example_post: str, number_words: int) -> str:
+        """
+        Helper function to generate a paraphrased version of the content.
+        """
+        # Create system prompt for paraphrasing
+        system_prompt = f"""You are a skilled social media writer with the following persona: {persona}.
+        
+        You're writing for an account with this description: {description}
+        
+        Here's an example of the account's typical post: "{example_post or 'No example available'}"
+        
+        Your task is to paraphrase or generate a new post based on the provided content, maintaining the persona's style and tone.
+        """
+        
+        # Get temperature from configured range
+        temp_range = self.content_config.get('temperature_range', (0.5, 1.0))
+        temperature = rd.uniform(temp_range[0], temp_range[1])
+        
+        # Make LLM call
+        response = self.client.chat.completions.create(
+            model='gpt-4o',
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Paraphrase or generate a new post with approximately {number_words} words that's under 280 characters:\n\n\"\"\"{content}\"\"\""}
+            ],
+            max_tokens=90,
+            temperature=temperature,
+        )
+        
+        return response.choices[0].message.content
+
+    def _shorten_response(self, response: str, persona: str, description: str, example_post: str, max_chars: int = 280) -> str:
+        """
+        Helper function to shorten a response to fit within character limit.
+        """
+        system_prompt = f"""You are a skilled social media writer with the following persona: {persona}.
+        
+        You're writing for an account with this description: {description}
+        
+        Your task is to shorten the provided content to strictly under {max_chars} characters while preserving the core message and tone.
+        """
+        
+        return self.client.chat.completions.create(
+            model='gpt-4o',
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "assistant", "content": response},
+                {"role": "user", "content": f"Please shorten the above content to strictly under {max_chars} characters while maintaining its core message."}
+            ],
+            max_tokens=60,
+            temperature=rd.uniform(0.5, 0.8),  # Use lower temperature for shortening
+        ).choices[0].message.content
+
     def set_session_id(self, session_id: str) -> None:
+        """Set the session ID for the agent and its queue client."""
         self.session_id = session_id
+        self.queue_client.set_session_id(session_id)
 
     def is_streaming_enabled(self) -> bool:
+        """Check if streaming is enabled for this agent."""
         return self.streaming is True
 
     async def process_request(
@@ -476,99 +735,6 @@ class RXRivalzAgent(Agent):
             #"extra_keyword": keywords  # Thêm từ khóa ngẫu nhiên
         })
     
-    def paraphrase(self, content:str) -> str:
-        persona = self.style_description
-        description = self.description
-        example_post = self.example_post
-
-        number_words = random.randint(10, 45)
-        response = self.client.chat.completions.create(
-            model='gpt-4o',
-            messages=[
-            {
-                "role": "system",
-                "content": (
-                f"You are a {description} with the following persona: {persona}. "
-                f"You have an example post that reads: {example_post}."
-                )
-            },
-            {
-                "role": "user",
-                "content": (
-                f"Provide a paraphrased version or generate a new POST with {number_words} words "
-                f"in 2-5 sentences, STRICTLY LIMITED TO UNDER 280 CHARACTERS, "
-                f"based on the following content or topic:\n\n\"\"\"{content}\"\"\""
-                )
-            }
-            ],
-            max_tokens=int(rd.randint(50, 90)),
-            temperature=rd.uniform(0.5,1.0),
-        ).choices[0].message.content
-        if len(response) > 280:
-            return self.client.chat.completions.create(
-                model='gpt-4o',
-                messages=[
-                {
-                    "role": "system",
-                    "content": (
-                    f"You are a {description} with the following persona: {persona}. "
-                    f"You have an example post that reads: {example_post}."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": (
-                    f"Provide a paraphrased version or generate a new POST with {number_words} words "
-                    f"in 2-5 sentences, STRICTLY LIMITED TO UNDER 280 CHARACTERS, "
-                    f"based on the following content or topic:\n\n\"\"\"{content}\"\"\""
-                    )
-                },
-                {"role": "assistant", "content": response},
-                {"role": "user", "content": f"Please shorten the above content to be strickily under 280 character!."}
-                ],
-            max_tokens=int(rd.randint(20, 60)),
-            temperature=rd.uniform(0.5,1.0),
-            timeout=20,
-        ).choices[0].message.content
-        else:
-            return response
-    ## help function
-    def post_to_X(self,tweet_text:str) -> str:
-        """
-        Instead of posting directly, this function queues the post request
-        params:
-            tweet_text: str : The content of the tweet
-        """
-        try:
-            content = self.paraphrase(tweet_text)
-            # API endpoint to add the post to the queue
-
-            url_post = f"{self.api_post}/agent/task"
-
-            payload = {
-                "type": 3,
-                "session_id": self.session_id,  # Session ID for thread tracking
-                "project_id": self.project_id,
-                "data": {
-                        "content": content,
-                        "x_id": str(self.x_id)
-                }
-            }
-            authen_key = self.project_auth_token  # Replace <key> with the actual authentication key
-            url_post_with_key = f"{url_post}?authen_key={authen_key}"
-            Logger.info(f"Posting to {url_post_with_key} with payload: {json.dumps(payload)}")
-            response = requests.post(url_post_with_key, json=payload)
-            
-            data = response.json()
-            if response.status_code != 200:
-                raise Exception(f"Error queueing post: {data.get('message')}")
-            job_id= data.get('data').get('job_id')            
-            # Return message to the user
-            return f"ADDED to Queues with ID {job_id}. You can check its status in the sidebar."
-        except Exception as e:
-            Logger.error(f"Error queueing post: {str(e)}")
-            return f"Error adding tweet to queue: {str(e)}"
-        
     def generate_keywords(self, content:str) -> str:
         prompt = str("Generate 10 topic (each topic <3 words) for the following content:\n\n " + content) 
         response =  self.client.chat.completions.create(
@@ -602,3 +768,381 @@ class RXRivalzAgent(Agent):
             else:
                 return default+"I am a popular agent with a large following."
         return "Social media (Twitter/X) agent"
+
+    def reset_persona(self, options: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Reset the agent's persona with optional custom attributes.
+        
+        Args:
+            options (Optional[Dict[str, Any]]): Custom persona options
+        """
+        # Generate new random persona traits if not specified
+        persona = {
+            "personality": options.get("personality") or random.choice(self.PERSONALITY_TRAITS["personality"]),
+            "tone": options.get("tone") or random.choice(self.PERSONALITY_TRAITS["tone"]),
+            "style": options.get("style") or random.choice(self.PERSONALITY_TRAITS["style"]),
+            "perspective": options.get("perspective") or random.choice(self.PERSONALITY_TRAITS["perspective"])
+        }
+        
+        # Set the new style description
+        self.style_description = json.dumps(persona)
+        
+        # Update description if provided
+        if options and "description" in options:
+            self.description = options["description"]
+        
+        # Update the system prompt with new persona
+        self.update_system_prompt()
+        
+        Logger.info(f"{self.name}: Persona reset with new traits: {persona}")
+        
+        return persona
+
+    def optimize_content_for_platform(self, content: str, platform: str = "x") -> str:
+        """
+        Optimize content for a specific platform's requirements and best practices.
+        
+        Args:
+            content (str): The original content to optimize
+            platform (str): The target platform (default: "x" for Twitter/X)
+            
+        Returns:
+            str: Optimized content for the target platform
+        """
+        if platform.lower() == "x":
+            # X-specific optimizations
+            max_chars = 280
+            
+            # Create a platform-specific prompt
+            platform_prompt = f"""
+            Optimize the following content for X (formerly Twitter), following these guidelines:
+            1. Maximum 280 characters
+            2. Make it engaging and shareable
+            3. Include relevant hashtags if appropriate
+            4. Use the agent's established tone: {json.loads(self.style_description)['tone']}
+            5. Maintain the core message while optimizing for engagement
+            
+            Original content: {content}
+            """
+            
+            response = self.client.chat.completions.create(
+                model='gpt-4o',
+                messages=[
+                    {"role": "system", "content": "You are a social media optimization expert specializing in X platform."},
+                    {"role": "user", "content": platform_prompt}
+                ],
+                max_tokens=120,
+                temperature=0.7,
+            )
+            
+            result = response.choices[0].message.content
+            
+            # Ensure it's within character limit
+            if len(result) > max_chars:
+                result = self._shorten_response(result, self.style_description, self.description, self.example_post, max_chars)
+                
+            return result
+        else:
+            # Generic optimization for other platforms
+            return content
+
+    async def generate_content_variations(self, original_content: str, count: int = 3) -> List[str]:
+        """
+        Generate multiple variations of content with the same core message.
+        
+        Args:
+            original_content (str): The original content to create variations from
+            count (int): Number of variations to generate (default: 3)
+            
+        Returns:
+            List[str]: List of content variations
+        """
+        if count < 1:
+            return [original_content]
+            
+        persona = self.style_description
+        description = self.description
+        
+        variations_prompt = f"""
+        Generate {count} unique variations of the following content. 
+        Each variation should:
+        1. Maintain the same core message
+        2. Be under 280 characters
+        3. Match the agent's persona: {persona}
+        4. Be distinct from each other in wording and structure
+        
+        Original content: {original_content}
+        """
+        
+        response = self.client.chat.completions.create(
+            model='gpt-4o',
+            messages=[
+                {"role": "system", "content": f"You are a social media content creator for an account with this description: {description}"},
+                {"role": "user", "content": variations_prompt}
+            ],
+            max_tokens=300,
+            temperature=0.9,
+        )
+        
+        # Parse variations from response (expecting numbered list)
+        variations_text = response.choices[0].message.content
+        variations = []
+        
+        # Extract numbered variations
+        import re
+        pattern = r'\d+\.\s*(.*?)(?=\d+\.|$)'
+        matches = re.findall(pattern, variations_text, re.DOTALL)
+        
+        if matches:
+            variations = [match.strip() for match in matches]
+        
+        # If parsing failed, split by newlines and try to extract meaningful content
+        if not variations:
+            variations = [line.strip() for line in variations_text.split('\n') if line.strip() and not line.strip().startswith('Original content:')]
+        
+        # Ensure we have the requested number of variations
+        while len(variations) < count:
+            variations.append(self.paraphrase(original_content))
+            
+        # Limit to requested count
+        return variations[:count]
+
+    def analyze_engagement_potential(self, content: str) -> Dict[str, Any]:
+        """
+        Analyze content for potential engagement metrics.
+        
+        Args:
+            content (str): Content to analyze
+            
+        Returns:
+            Dict[str, Any]: Analysis results including engagement metrics
+        """
+        # Create an analysis prompt
+        analysis_prompt = f"""
+        Analyze the following post for X (formerly Twitter) and predict its engagement potential.
+        Provide scores from 1-10 for these metrics:
+        - Shareability: How likely users will retweet/share this content
+        - Engagement: How likely users will interact (likes, replies)
+        - Clarity: How clear and understandable the message is
+        - Originality: How unique or fresh the content is
+        - Topic relevance: How relevant the topic is to current trends
+        
+        Based on these scores, identify:
+        1. Strengths of the post
+        2. Areas for improvement
+        3. Overall engagement prediction (low/medium/high)
+        
+        Post: {content}
+        """
+        
+        response = self.client.chat.completions.create(
+            model='gpt-4o',
+            messages=[
+                {"role": "system", "content": "You are a social media analytics expert. Respond in JSON format with numeric scores and brief text analysis."},
+                {"role": "user", "content": analysis_prompt}
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=200,
+            temperature=0.3,
+        )
+        
+        try:
+            result = json.loads(response.choices[0].message.content)
+            return result
+        except json.JSONDecodeError:
+            # Fallback if JSON parsing fails
+            return {
+                "error": "Failed to parse analysis",
+                "raw_response": response.choices[0].message.content,
+                "overall_prediction": "unknown"
+            }
+
+    def suggest_optimal_posting_time(self, content_theme: str) -> Dict[str, Any]:
+        """
+        Suggest optimal posting times based on content theme and audience patterns.
+        
+        Args:
+            content_theme (str): Theme or category of the content
+            
+        Returns:
+            Dict[str, Any]: Suggested posting times with reasoning
+        """
+        # Create a prompt for suggesting optimal posting times
+        time_prompt = f"""
+        Based on typical X (Twitter) engagement patterns and the following content theme,
+        suggest the optimal posting time(s) in a structured format.
+        
+        Content theme: {content_theme}
+        
+        Include:
+        1. Best day(s) of week
+        2. Best time(s) of day (in ET/Eastern Time)
+        3. Reasoning for the recommendation
+        4. Alternative time(s) for global audience
+        """
+        
+        response = self.client.chat.completions.create(
+            model='gpt-4o',
+            messages=[
+                {"role": "system", "content": "You are a social media timing optimization expert. Respond in JSON format."},
+                {"role": "user", "content": time_prompt}
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=150,
+            temperature=0.4,
+        )
+        
+        try:
+            result = json.loads(response.choices[0].message.content)
+            return result
+        except json.JSONDecodeError:
+            # Fallback if JSON parsing fails
+            return {
+                "best_days": ["Wednesday", "Thursday"],
+                "best_times": ["12:00 PM ET", "5:00 PM ET"],
+                "reasoning": "Default recommendation based on typical engagement patterns",
+                "alternative_times": ["9:00 AM ET", "8:00 PM ET"]
+            }
+
+    # Factory method for creating specialized versions of the agent
+    @classmethod
+    def create_specialized(cls, specialization: str, options: RXAgentRivalzOptions) -> 'RXRivalzAgent':
+        """
+        Factory method to create specialized versions of RXRivalzAgent.
+        
+        Args:
+            specialization (str): Type of specialization (e.g., 'news', 'marketing', 'support')
+            options (RXAgentRivalzOptions): Base configuration options
+            
+        Returns:
+            RXRivalzAgent: Specialized agent instance
+        """
+        # Specialized prompt templates by type
+        specialized_templates = {
+            "news": """
+            # Role: {{name}} - News Content Specialist
+            
+            ## Agent Information
+            {{description}}
+            
+            ## Style and Personality
+            My writing style: {{style_description}}
+            
+            ## Platform Information
+            I'm a news-focused social media agent for X (formerly Twitter), where content is limited to 280 characters.
+            
+            ## Instructions
+            - Provide concise, accurate, and neutral news updates
+            - Focus on factual reporting and clarity
+            - Include relevant context for news items
+            - Cite sources when appropriate
+            - Avoid sensationalism while maintaining engagement
+            - Stay within character limits (280 characters)
+            - If asked to post something to X, I can use the tweet_to_queue tool
+            
+            ## Examples
+            Sample post: {{example_post}}
+            
+            ## Guidelines
+            - Prioritize accuracy and timeliness
+            - Present multiple perspectives when relevant
+            - Follow journalistic ethics and standards
+            - Provide value through information, not just opinions
+            - Engage with news-related questions professionally
+            """,
+            
+            "marketing": """
+            # Role: {{name}} - Marketing Content Specialist
+            
+            ## Agent Information
+            {{description}}
+            
+            ## Style and Personality
+            My writing style: {{style_description}}
+            
+            ## Platform Information
+            I'm a marketing-focused social media agent for X (formerly Twitter), where content is limited to 280 characters.
+            
+            ## Instructions
+            - Create engaging, persuasive marketing content
+            - Highlight benefits and value propositions
+            - Use compelling calls-to-action
+            - Incorporate persuasive techniques appropriately
+            - Maintain brand voice consistency
+            - Stay within character limits (280 characters)
+            - If asked to post something to X, I can use the tweet_to_queue tool
+            
+            ## Examples
+            Sample post: {{example_post}}
+            
+            ## Guidelines
+            - Focus on customer benefits, not just features
+            - Use attention-grabbing openings
+            - Incorporate social proof when relevant
+            - Create a sense of urgency or exclusivity when appropriate
+            - Use emotive language strategically
+            """,
+            
+            "support": """
+            # Role: {{name}} - Customer Support Specialist
+            
+            ## Agent Information
+            {{description}}
+            
+            ## Style and Personality
+            My writing style: {{style_description}}
+            
+            ## Platform Information
+            I'm a customer support specialist for X (formerly Twitter), where content is limited to 280 characters.
+            
+            ## Instructions
+            - Provide helpful, empathetic customer support
+            - Address concerns with professionalism and care
+            - Maintain a positive, solution-oriented approach
+            - Escalate complicated issues appropriately
+            - Stay within character limits (280 characters)
+            - If asked to post something to X, I can use the tweet_to_queue tool
+            
+            ## Examples
+            Sample post: {{example_post}}
+            
+            ## Guidelines
+            - Acknowledge customer concerns promptly
+            - Express empathy for their situation
+            - Provide clear, actionable solutions
+            - Follow up to ensure resolution
+            - Maintain a friendly, helpful tone even in difficult situations
+            """
+        }
+        
+        # Set specialized template if available
+        if specialization in specialized_templates:
+            if not options.prompt_templates:
+                options.prompt_templates = {}
+            options.prompt_templates['default'] = specialized_templates[specialization]
+            
+            # Adjust persona for the specialization
+            if specialization == "news":
+                options.style_description = json.dumps({
+                    "personality": "analytical",
+                    "tone": "informative",
+                    "style": "concise",
+                    "perspective": "neutral observer"
+                })
+            elif specialization == "marketing":
+                options.style_description = json.dumps({
+                    "personality": "enthusiastic",
+                    "tone": "persuasive",
+                    "style": "engaging",
+                    "perspective": "advocate"
+                })
+            elif specialization == "support":
+                options.style_description = json.dumps({
+                    "personality": "empathetic",
+                    "tone": "helpful",
+                    "style": "clear",
+                    "perspective": "problem solver"
+                })
+        
+        # Create and return the specialized agent
+        return cls(options)

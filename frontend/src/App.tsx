@@ -13,8 +13,17 @@ function App() {
     if (session?.socket.connected) {
       return;
     }
-    fetch("http:localhost/custom-auth", {credentials: "include"})
-      .then(() => {
+    fetch("https://rxorchestration.rivalz.ai/custom-auth", {
+      method: "POST",
+      headers: {
+      "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+      project_id: "67b465519870d36dd0fd9818",
+      project_name: "Qualoo"
+      }),
+      credentials: "include"
+    }).then(() => {
         connect({
           userEnv
         });
