@@ -396,96 +396,84 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
             
         except Exception as e:
             Logger.error(f"Authentication error: {str(e)}")
-            # Empty the team on authentication failure
-            self.team_manager.set_team([])
-            self.team = []
-            self.x_ids = []
-            raise
+            raise Exception("Authentication error")
 
-    async def _create_rx_team_from_data(self, agent_data_list: List[Dict[str, Any]]) -> None:
-        """Create RX agents from the provided data"""
+    def _create_rx_team(self, auth_data: dict) -> None:
+        """Create RX agents team from authentication data"""
         try:
-            if not agent_data_list:
-                raise ValueError("No agent data available to create team")
-            
-            # Limit to the requested number of agents
-            num_agents = min(self.number_of_agents, len(agent_data_list))
-            Logger.info(f"Creating RX team with up to {num_agents} agents")
-            
-            # Prepare base configuration
-            base_config = {
-                'api_key': self.lead_agent.api_key,
-                'model': self.lead_agent.model,
-                'base_url': self.lead_agent.base_url,
-                'project_auth_token': self.authen_key,
-                'project_id': self.project_id,
-                'api_url': self.api_url,
-                'callbacks': self.callbacks,
-                'share_global_memory': True,
-                'session_id': self.session_id if hasattr(self, 'session_id') else None,
-                'prompt_templates': self.custom_prompt_templates,
-                'content_formatting': self.content_formatting
-            }
-            
-            # Create agents
             rx_agents = []
-            for agent_data in agent_data_list[:num_agents]:
-                # Skip agents without x_id
-                x_id = agent_data.get('x_id')
-                if not x_id:
-                    Logger.warn(f"Skipping agent due to missing x_id")
-                    continue
-                
-                try:
-                    # Create agent
-                    agent = AgentFactory.create_agent(agent_data, base_config)
-                    
-                    # Apply specialization if specified
-                    if self.agent_specialization and self.agent_specialization in ["news", "marketing", "support"]:
-                        # Create specialized version
-                        specialized_options = RXAgentRivalzOptions(
-                            api_key=agent.client.api_key,
-                            project_auth_token=agent.project_auth_token,
-                            project_id=agent.project_id,
-                            x_id=agent.x_id,
-                            model=agent.model,
-                            base_url=agent.base_url,
-                            xaccesstoken=agent.xaccesstoken,
-                            xrefreshtoken=agent.xrefreshtoken,
-                            style_description=agent.style_description,
-                            prompt_templates=self.custom_prompt_templates,
-                            content_formatting=self.content_formatting
-                        )
-                        
-                        # Replace with specialized agent
-                        agent = RXRivalzAgent.create_specialized(
-                            self.agent_specialization, 
-                            specialized_options
-                        )
-                        
-                        # Set session ID if available
-                        if hasattr(self, 'session_id'):
-                            agent.set_session_id(self.session_id)
-                    
-                    rx_agents.append(agent)
-                    
-                except Exception as e:
-                    Logger.error(f"Error creating agent for x_id {x_id}: {str(e)}")
-                    # Continue with next agent
-                    continue
+            # Access the nested 'data' array
+            auth_data = auth_data.get('data', {})
+            if not auth_data:
+                raise ValueError("No data found in authentication response")
+            resources = auth_data.get('resources', {})
+            if not resources:
+                raise ValueError("No resources found in authentication data")
+            token_list = resources.get('rx', [])
+            if not token_list:
+                raise ValueError("No rx agent found in authentication data")
             
-            if not rx_agents:
-                raise ValueError("Failed to create any RX agents from authentication data")
+            num_agents = min(self.number_of_agents, len(token_list))
+            self.number_of_agents = len(token_list)
+            Logger.info(f"Creating RX team with {num_agents} agents")
+            self.x_ids = []
+            self.team_info = {"type":"RX", "num_agents": len(token_list)}
+            Logger.info(f"Successfully created RX team with {self.number_of_agents} agents")
+            # for idx, token_data in enumerate(token_list):
+            #     # Extract tokens and expiration
+            #     # if idx >= num_agents:
+            #     #     break
+            #     self.x_ids.append(token_data.get('x_id'))
+            #     access_token = token_data.get('access_token')
+            #     refresh_token = token_data.get('refresh_token')
+            #     followers_count = token_data.get('followers_count')
+            #     following_count = token_data.get('following_count')
+            #     tweet_count = token_data.get('tweet_count')
+            #     like_count = token_data.get('like_count')
+            #     example_post = token_data.get('example_post')
+            #     style_description = token_data.get('style_description')
+            #     x_id = token_data.get('x_id')
+            #     project_auth_token = self.authen_key
+            #     api_post = self.api_url
+            #     if not x_id or x_id =="":
+            #         Logger.warn(f"Skipping agent {idx + 1} due to missing x_id")
+            #         continue
+
+            #     agent = RXRivalzAgent(RXAgentRivalzOptions(
+            #         name=f"RX_Agent_{x_id}",
+            #         api_key=self.lead_agent.api_key,  # Use same OpenAI key as lead agent
+            #         model=self.lead_agent.model,  # Use same OpenAI model as lead agent
+            #         base_url=self.lead_agent.base_url,  # Use same OpenAI base URL as lead agent
+            #         xaccesstoken=access_token,
+            #         xrefreshtoken=refresh_token,
+            #         x_id=x_id,
+            #         followers_count=followers_count,
+            #         following_count=following_count,
+            #         tweet_count=tweet_count,
+            #         like_count=like_count,
+            #         example_post=example_post,
+            #         style_description=style_description,
+            #         project_auth_token=project_auth_token,
+            #         api_post=api_post, 
+            #         project_id=self.project_id,
+            #         inference_config={
+            #             'maxTokens': 500,
+            #             'temperature': 0.5,
+            #             'topP': 0.8,
+            #             'stopSequences': []
+            #         },
+            #         callbacks=self.callbacks,
+            #         share_global_memory=True,
+            #     ))
+            #     rx_agents.append(agent)
+            #     Logger.info(f"Created RX_Agent_{idx + 1} with access token")
             
-            # Update the team in manager
-            self.team_manager.set_team(rx_agents)
-            
-            # Update references for compatibility
-            self.team = rx_agents
-            self.x_ids = [agent.x_id for agent in rx_agents if agent.x_id]
-            
-            Logger.info(f"Successfully created RX team with {len(rx_agents)} agents")
-            
+            # if not rx_agents:
+            #     raise ValueError("Failed to create any RX agents from authentication data")
+
+            # self.team = rx_agents
+            # Logger.info(f"Successfully created RX team with {len(rx_agents)} agents")
+        
         except Exception as e:
             Logger.error(f"Error creating RX team: {str(e)}")
             raise
