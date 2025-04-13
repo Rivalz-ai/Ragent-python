@@ -9,12 +9,16 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from chainlit.context import init_http_context
 from fastapi.middleware.cors import CORSMiddleware
+
+from chainlit.user import User
+from chainlit.utils import mount_chainlit
+from chainlit.server import _authenticate_user
 app = FastAPI()
 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
+    allow_origins=["http://localhost:5173", "https://rxorchestration.rivalz.ai"],  # Allow all origins
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods
     allow_headers=["*"],  # Allow all headers
@@ -22,6 +26,32 @@ app.add_middleware(
 
 # Mount API router
 app.mount("/api", api_router)
+
+
+from rAgent.utils import Logger
+@app.post("/custom-auth")
+async def custom_auth(request: Request):
+    try:
+        Logger.info("Starting custom authentication")
+        data = await request.json()
+        project_id = data.get("project_id")
+        project_name = data.get("project_name")
+        if not project_id or not project_name:
+            return {"error": "Both 'project_id' and 'project_name' are required."}
+
+        # Ensure required fields are present
+        if not project_id.strip() or not project_name.strip():
+            return {"error": "'project_id' and 'project_name' cannot be empty or whitespace."}
+
+        payload = {'project_id': project_id, 'project_name': project_name}
+        user = User(identifier=project_name, metadata=payload)
+        Logger.info(f"User created: {user}")
+        response = await _authenticate_user(request,user)
+        Logger.info("Authentication successful")
+        return response
+    except Exception as e:
+        Logger.error(f"Error in custom_auth: {e}")
+        return {"error": str(e)}
 
 # Mount Chainlit application
 mount_chainlit(app=app, target="rivalz_multiRX.py", path="/chat")

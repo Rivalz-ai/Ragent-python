@@ -1,5 +1,6 @@
 from rAgent.orchestrator import SwarmOrchestrator
 from rAgent.agents import SupervisorAgent
+from rAgent.ragents.RXRivalz_team_V1 import RXTeamSupervisorRivalz
 import re
 import yaml
 
@@ -20,8 +21,12 @@ def generate_start_message(orchestrator: SwarmOrchestrator) -> str:
                     agent_counts[agent_type] += 1
                 else:
                     agent_counts[agent_type] = 1
-            agent_details = "\n".join([f"{agent_type} - Count: {count}" for agent_type, count in agent_counts.items()])
-            message += f"- {agent.name} (SupervisorAgent) with the following team:\n{agent_details}\n"
+            message += f"- {agent.name} with the following team:\n"
+            if len(agent.team) > 1:
+                agent_details = "\n".join([f"{agent_type} - Count: {count}" for agent_type, count in agent_counts.items()])
+                message += f"\n{agent_details}\n"
+            if isinstance(agent, RXTeamSupervisorRivalz):
+                message += f"  - {agent.team_info['type']}: {agent.team_info['num_agents']}\n"
         else:
             message += f"- {agent.name} ({type(agent).__name__})\n"
     return message

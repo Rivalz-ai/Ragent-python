@@ -10,9 +10,6 @@ import re
 import asyncio
 import requests
 import aiohttp
-import os
-import aiohttp
-import os
 from rAgent.utils import Logger
 import logging
 # Other imports...
@@ -151,16 +148,21 @@ async def header_auth_callback(headers: Dict) -> Optional[User]:
                     metadata=payload,
             )
             Logger.info(f"Authenticated user: {project_name} with project_id: {project_id}")
-            return user
         else:
             Logger.warn("No project_id or project_name found in the URL")
-            return None
-    else:   
-        Logger.warn("No referrer found in headers")
-        return None
-    
-
-    
+            raise ValueError("No project_id or project_name found in the URL")
+    return user
+# @cl.password_auth_callback
+# def auth_callback(project_name: str, project_id: str):
+#     # Fetch the user matching username from your database
+#     # and compare the hashed password with the value stored in the database
+#     payload = {'project_id': project_id, 'project_name':project_name }
+#     if project_name and project_id:
+#         return cl.User(
+#             identifier="project_name", metadata=payload
+#         )
+#     else:
+#         return None
 
 
 
@@ -170,7 +172,8 @@ async def start():
     # Get the project_id from the user session
     user = cl.user_session.get("user")
     # Extract project info from user metadata
-    project_id = None    
+    project_id = None
+    Logger.info(f"User is {user}")    
     if user and user.metadata:
         project_id = user.metadata.get("project_id")
         Logger.info(f"Project ID from user metadata: {project_id}")

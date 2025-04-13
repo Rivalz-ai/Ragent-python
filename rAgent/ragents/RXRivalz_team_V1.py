@@ -56,7 +56,7 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
                 self.team = []
         except Exception as e:
             Logger.error(f"Authentication error: {str(e)}")
-            raise E
+            raise Exception("Authentication error")
 
     def _create_rx_team(self, auth_data: dict) -> None:
         """Create RX agents team from authentication data"""
@@ -74,62 +74,65 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
                 raise ValueError("No rx agent found in authentication data")
             
             num_agents = min(self.number_of_agents, len(token_list))
+            self.number_of_agents = len(token_list)
             Logger.info(f"Creating RX team with {num_agents} agents")
             self.x_ids = []
-            for idx, token_data in enumerate(token_list):
-                # Extract tokens and expiration
-                # if idx >= num_agents:
-                #     break
-                self.x_ids.append(token_data.get('x_id'))
-                access_token = token_data.get('access_token')
-                refresh_token = token_data.get('refresh_token')
-                followers_count = token_data.get('followers_count')
-                following_count = token_data.get('following_count')
-                tweet_count = token_data.get('tweet_count')
-                like_count = token_data.get('like_count')
-                example_post = token_data.get('example_post')
-                style_description = token_data.get('style_description')
-                x_id = token_data.get('x_id')
-                project_auth_token = self.authen_key
-                api_post = self.api_url
-                if not x_id or x_id =="":
-                    Logger.warn(f"Skipping agent {idx + 1} due to missing x_id")
-                    continue
+            self.team_info = {"type":"RX", "num_agents": len(token_list)}
+            Logger.info(f"Successfully created RX team with {self.number_of_agents} agents")
+            # for idx, token_data in enumerate(token_list):
+            #     # Extract tokens and expiration
+            #     # if idx >= num_agents:
+            #     #     break
+            #     self.x_ids.append(token_data.get('x_id'))
+            #     access_token = token_data.get('access_token')
+            #     refresh_token = token_data.get('refresh_token')
+            #     followers_count = token_data.get('followers_count')
+            #     following_count = token_data.get('following_count')
+            #     tweet_count = token_data.get('tweet_count')
+            #     like_count = token_data.get('like_count')
+            #     example_post = token_data.get('example_post')
+            #     style_description = token_data.get('style_description')
+            #     x_id = token_data.get('x_id')
+            #     project_auth_token = self.authen_key
+            #     api_post = self.api_url
+            #     if not x_id or x_id =="":
+            #         Logger.warn(f"Skipping agent {idx + 1} due to missing x_id")
+            #         continue
 
-                agent = RXRivalzAgent(RXAgentRivalzOptions(
-                    name=f"RX_Agent_{x_id}",
-                    api_key=self.lead_agent.api_key,  # Use same OpenAI key as lead agent
-                    model=self.lead_agent.model,  # Use same OpenAI model as lead agent
-                    base_url=self.lead_agent.base_url,  # Use same OpenAI base URL as lead agent
-                    xaccesstoken=access_token,
-                    xrefreshtoken=refresh_token,
-                    x_id=x_id,
-                    followers_count=followers_count,
-                    following_count=following_count,
-                    tweet_count=tweet_count,
-                    like_count=like_count,
-                    example_post=example_post,
-                    style_description=style_description,
-                    project_auth_token=project_auth_token,
-                    api_post=api_post, 
-                    project_id=self.project_id,
-                    inference_config={
-                        'maxTokens': 500,
-                        'temperature': 0.5,
-                        'topP': 0.8,
-                        'stopSequences': []
-                    },
-                    callbacks=self.callbacks,
-                    share_global_memory=True,
-                ))
-                rx_agents.append(agent)
-                Logger.info(f"Created RX_Agent_{idx + 1} with access token")
+            #     agent = RXRivalzAgent(RXAgentRivalzOptions(
+            #         name=f"RX_Agent_{x_id}",
+            #         api_key=self.lead_agent.api_key,  # Use same OpenAI key as lead agent
+            #         model=self.lead_agent.model,  # Use same OpenAI model as lead agent
+            #         base_url=self.lead_agent.base_url,  # Use same OpenAI base URL as lead agent
+            #         xaccesstoken=access_token,
+            #         xrefreshtoken=refresh_token,
+            #         x_id=x_id,
+            #         followers_count=followers_count,
+            #         following_count=following_count,
+            #         tweet_count=tweet_count,
+            #         like_count=like_count,
+            #         example_post=example_post,
+            #         style_description=style_description,
+            #         project_auth_token=project_auth_token,
+            #         api_post=api_post, 
+            #         project_id=self.project_id,
+            #         inference_config={
+            #             'maxTokens': 500,
+            #             'temperature': 0.5,
+            #             'topP': 0.8,
+            #             'stopSequences': []
+            #         },
+            #         callbacks=self.callbacks,
+            #         share_global_memory=True,
+            #     ))
+            #     rx_agents.append(agent)
+            #     Logger.info(f"Created RX_Agent_{idx + 1} with access token")
             
-            if not rx_agents:
-                raise ValueError("Failed to create any RX agents from authentication data")
+            # if not rx_agents:
+            #     raise ValueError("Failed to create any RX agents from authentication data")
 
-            self.team = rx_agents
-            Logger.info(f"Successfully created RX team with {len(rx_agents)} agents")
+            # self.team = rx_agents
+            # Logger.info(f"Successfully created RX team with {len(rx_agents)} agents")
         
         except Exception as e:
             Logger.error(f"Error creating RX team: {str(e)}")
