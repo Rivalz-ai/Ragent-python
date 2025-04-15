@@ -154,7 +154,7 @@ def create_X_agent():
         )
     return RXAgent(options)
 
-def create_rx_supervisor(storage = None, num_agents=99, project_id=None):
+async def create_rx_supervisor(storage = None, num_agents=99, project_id=None):
     lead_agent = OpenAIAgent(OpenAIAgentOptions(
         api_key=OPENAI_API_KEY,
         name="SupervisorAgent",
@@ -185,12 +185,19 @@ def create_rx_supervisor(storage = None, num_agents=99, project_id=None):
             callbacks=ChainlitAgentCallbacks(),
             share_global_memory=True,
             number_of_agents=num_agents,
-            
+            # Advanced options (optional)
+            custom_prompt_templates={},
+            content_formatting={}
         )
     )
     
-    # Initialize supervisor and create team
-    supervisor.initialize()
+    # Initialize supervisor (now only fetches team information, doesn't create agents)
+    await supervisor.initialize()
+    
+    # Log team statistics
+    team_stats = supervisor.get_team_stats()
+    Logger.info(f"Team initialized with {team_stats['rx_available']} RX agents available")
+    
     return supervisor
 
 def create_classifier():

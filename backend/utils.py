@@ -26,7 +26,13 @@ def generate_start_message(orchestrator: SwarmOrchestrator) -> str:
                 agent_details = "\n".join([f"{agent_type} - Count: {count}" for agent_type, count in agent_counts.items()])
                 message += f"\n{agent_details}\n"
             if isinstance(agent, RXTeamSupervisorRivalz):
-                message += f"  - {agent.team_info['type']}: {agent.team_info['num_agents']}\n"
+                if agent.team_info:
+                    rx_count = agent.team_info.get('rx_count', 0)
+                    swarm_level = agent.team_info.get('info', {}).get('swarm_level', 'Unknown')
+                    message += f"  - RX Agents Available: {rx_count}\n"
+                    message += f"  - Swarm Level: {swarm_level}\n"
+                else:
+                    message += f"  - RX Team (not initialized)\n"
         else:
             message += f"- {agent.name} ({type(agent).__name__})\n"
     return message

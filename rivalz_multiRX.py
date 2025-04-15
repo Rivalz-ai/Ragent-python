@@ -89,9 +89,10 @@ async def update_task_stats(session_id:str, project_id: str):
             Logger.info("Updated task stats")
         except Exception as e:
             Logger.error(f"Error in background task: {e}")
-        await asyncio.sleep(60)
+        await asyncio.sleep(5)
 
-def start_orchestrator(project_id: str, shared_storage):
+# Change to async function
+async def start_orchestrator(project_id: str, shared_storage):
     # TODO: Implement the creation of the orchestrator
     # with the project_id
     Logger.info("Shared storage initialized")
@@ -100,7 +101,8 @@ def start_orchestrator(project_id: str, shared_storage):
     health_agent = create_health_agent()
     travel_agent = create_travel_agent()
     default_agent = create_default_agent()
-    rx_supervisor = create_rx_supervisor(storage = shared_storage, num_agents=9, project_id=project_id)
+    # Add await keyword to call the async function properly
+    rx_supervisor = await create_rx_supervisor(storage = shared_storage, num_agents=9, project_id=project_id)
     # Initialize orchestrator
     Logger.info("Initializing orchestrator")
     orchestrator = SwarmOrchestrator(options=OrchestratorConfig(
@@ -211,7 +213,7 @@ async def start():
     # Initialize orchestrator and rx_supervisor with project_id
     # Replace auth_key with project_id
     shared_storage = InMemoryChatStorage()
-    orchestrator,rx_supervisor = start_orchestrator(project_id,shared_storage)
+    orchestrator,rx_supervisor = await start_orchestrator(project_id,shared_storage)
     # Store the orchestrator and rx_supervisor in the user session
     cl.user_session.set("orchestrator", orchestrator)
     cl.user_session.set("rx_supervisor", rx_supervisor)

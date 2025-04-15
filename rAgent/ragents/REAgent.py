@@ -2,7 +2,7 @@ from rAgent.agents.agent import Agent, AgentOptions
 from rAgent.types import ConversationMessage
 from typing import Dict, List, Optional, Any, Union, AsyncIterable
 
-class ExecuteAgent(Agent):
+class REAgent(Agent):
     def __init__(self, options: AgentOptions):
         super().__init__(options)
         self.description = "Agent that interacts with Linux systems (execute commands, perform curls, build Docker images, fix bugs)."

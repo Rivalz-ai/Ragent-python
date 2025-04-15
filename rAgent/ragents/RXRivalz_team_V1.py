@@ -13,6 +13,7 @@ import asyncio
 import httpx
 from abc import ABC, abstractmethod
 import random
+from .tweet_generator import TweetGenerator  # Import at the top level
 
 # Base class for team authentication strategies
 class AuthenticationStrategy(ABC):
@@ -157,14 +158,28 @@ class RivalzRXEndpointStrategy(AuthenticationStrategy):
             Logger.error(f"Error extracting agent data from RX endpoint: {str(e)}")
             return []
 
-# Factory for creating agents
+@dataclass
+class RXTeamSupervisorRivalzOptions(SupervisorAgentOptions):
+    """Configuration options for RXTeamSupervisorRivalz."""
+    authen_key: str = field(default="")
+    project_id: str = field(default="")
+    api_url: str = "https://staging-rome-api-v2.rivalz.ai"
+    token_refresh_minutes: int = 110
+    number_of_agents: int = 3
+    # Advanced options
+    agent_specialization: Optional[str] = None
+    custom_prompt_templates: Dict[str, str] = field(default_factory=dict)
+    content_formatting: Dict[str, Any] = field(default_factory=dict)
+
 class AgentFactory:
-    """Factory for creating RXRivalzAgent instances"""
+    """
+    Factory for creating RXRivalzAgent instances on demand.
+    """
     
     @staticmethod
     def create_agent(agent_config: Dict[str, Any], base_config: Dict[str, Any]) -> RXRivalzAgent:
         """
-        Create an RXRivalzAgent with the provided configuration
+        Create an RXRivalzAgent with the provided configuration.
         
         Args:
             agent_config: Agent-specific configuration (tokens, profile data)
@@ -174,12 +189,12 @@ class AgentFactory:
             RXRivalzAgent instance
         """
         try:
-            # Extract needed information from configs
+            # Check for x_id
             x_id = agent_config.get('x_id')
             if not x_id:
                 raise ValueError("Missing x_id in agent configuration")
                 
-            # Required agent configuration
+            # Configure agent
             options = RXAgentRivalzOptions(
                 name=f"RX_Agent_{x_id}",
                 api_key=base_config.get('api_key'),
@@ -217,7 +232,7 @@ class AgentFactory:
                 share_global_memory=base_config.get('share_global_memory', True),
                 streaming=base_config.get('streaming', False),
                 
-                # Support for custom prompts
+                # Support for custom prompt templates
                 prompt_templates=base_config.get('prompt_templates', {}),
                 content_formatting=base_config.get('content_formatting', {})
             )
@@ -236,303 +251,136 @@ class AgentFactory:
             Logger.error(f"Error creating agent: {str(e)}")
             raise
 
-# Class for agent team management
-class AgentTeamManager:
-    """Manages a team of agents with token refresh capabilities"""
-    
-    def __init__(self, refresh_callback: Callable[[], None], refresh_interval_minutes: int = 110):
-        """
-        Initialize the team manager
-        
-        Args:
-            refresh_callback: Function to call when token refresh is needed
-            refresh_interval_minutes: Interval in minutes between token refreshes
-        """
-        self.team: List[RXRivalzAgent] = []
-        self.x_ids: Set[str] = set()
-        self.refresh_callback = refresh_callback
-        self.refresh_interval_minutes = refresh_interval_minutes
-        self.refresh_timer = None
-        self.last_refresh_time = None
-    
-    def set_team(self, agents: List[RXRivalzAgent]) -> None:
-        """Set the current team of agents"""
-        self.team = agents
-        self.x_ids = {agent.x_id for agent in agents if agent.x_id}
-        Logger.info(f"Team updated with {len(agents)} agents")
-    
-    def schedule_refresh(self, delay_minutes: Optional[int] = None) -> None:
-        """Schedule the next token refresh"""
-        # Cancel any existing timer
-        if self.refresh_timer:
-            self.refresh_timer.cancel()
-            self.refresh_timer = None
-        
-        # Use default interval if not specified
-        if delay_minutes is None:
-            delay_minutes = self.refresh_interval_minutes
-        
-        # Convert to seconds
-        delay_seconds = delay_minutes * 60
-        
-        Logger.info(f"Scheduling next token refresh in {delay_minutes} minutes")
-        
-        # Create and start timer
-        self.refresh_timer = threading.Timer(delay_seconds, self.refresh_callback)
-        self.refresh_timer.daemon = True
-        self.refresh_timer.start()
-        
-    def force_refresh(self) -> None:
-        """Force an immediate refresh of tokens"""
-        Logger.info("Forcing immediate token refresh")
-        
-        # Cancel existing timer
-        if self.refresh_timer:
-            self.refresh_timer.cancel()
-            self.refresh_timer = None
-        
-        # Perform refresh
-        self.refresh_callback()
-    
-    def cleanup(self) -> None:
-        """Clean up resources"""
-        if self.refresh_timer:
-            self.refresh_timer.cancel()
-            self.refresh_timer = None
-        
-        self.team = []
-        self.x_ids = set()
-
-@dataclass
-class RXTeamSupervisorRivalzOptions(SupervisorAgentOptions):
-    authen_key: str = field(default="")
-    project_id: str = field(default="")
-    api_url: str = "https://staging-rome-api-v2.rivalz.ai"
-    token_refresh_minutes: int = 110
-    number_of_agents: int = 3
-    # New options for enhanced agent configuration
-    agent_specialization: Optional[str] = None
-    enhanced_content_generation: bool = False
-    custom_prompt_templates: Dict[str, str] = field(default_factory=dict)
-    content_formatting: Dict[str, Any] = field(default_factory=dict)
-
 class RXTeamSupervisorRivalz(SupervisorAgent):
     """
     Supervisor for a team of RXRivalzAgent instances.
-    Handles authentication, team creation, and token refresh.
+    Only stores team information initially and creates agents on-demand when needed.
     """
     
     def __init__(self, options: RXTeamSupervisorRivalzOptions):
-        """Initialize the supervisor with the provided options"""
-        # Initialize base attributes from options
+        """Initialize the supervisor with provided options."""
+        # Initialize basic attributes from options
         self.authen_key = options.authen_key
         self.project_id = options.project_id
         self.api_url = options.api_url
-        self.token_refresh_minutes = options.token_refresh_minutes
         self.number_of_agents = options.number_of_agents or 3
         
-        # Enhanced options
+        # Advanced options
         self.agent_specialization = options.agent_specialization
-        self.enhanced_content_generation = options.enhanced_content_generation
         self.custom_prompt_templates = options.custom_prompt_templates
         self.content_formatting = options.content_formatting
         
-        # Initialize team manager
-        self.team_manager = AgentTeamManager(
-            refresh_callback=self.refresh_tokens,
-            refresh_interval_minutes=self.token_refresh_minutes
-        )
-        
-        # Authentication strategies
-        self.auth_strategies = {
-            'swarm': RivalzAPIAuthStrategy(),
-            'rx': RivalzRXEndpointStrategy()
-        }
-        
-        # Set default authentication strategy
-        self.current_auth_strategy = 'swarm'
-        
-        # Initialize empty team and x_ids for compatibility
-        self.team = []
-        self.x_ids = []
+        # Initialize state variables
+        self.team_info = None  # Only store team info, don't create agents immediately
+        self.team = []  # Keep for compatibility with old code
+        self.x_ids = []  # Keep for compatibility with old code
         
         # Call parent constructor
         super().__init__(options)
 
-    async def authenticate_and_create_team(self) -> None:
-        """Fetch access tokens and create RX agent team"""
+    async def fetch_team_info(self) -> Dict[str, Any]:
+        """
+        Fetch team information from API and update team_info.
+        
+        Returns:
+            Dictionary containing team information, or empty dict if error
+        """
         try:
-            Logger.info(f"Starting authentication with strategy: {self.current_auth_strategy}")
+            params = {'authen_key': self.authen_key, 'project_id': self.project_id}
+            api_url = f"{self.api_url}/agent/swarm"
+            Logger.info(f"Fetching team info from API at {api_url}")
             
-            # Get the right authentication strategy
-            auth_strategy = self.auth_strategies.get(self.current_auth_strategy)
-            if not auth_strategy:
-                raise ValueError(f"Unknown authentication strategy: {self.current_auth_strategy}")
+            async with httpx.AsyncClient(timeout=20) as client:
+                response = await client.get(api_url, params=params)
+                
+            if response.status_code != 200:
+                Logger.error(f"Error fetching team info: {response.status_code} - {response.text}")
+                return {}
+                
+            data = response.json()
+            resources = data.get('data', {}).get('resources', {})
             
-            # Prepare configuration for authentication
-            auth_config = {
-                'authen_key': self.authen_key,
-                'project_id': self.project_id,
-                'api_url': self.api_url,
-                'num': self.number_of_agents
+            # Update team info
+            self.team_info = {
+                'info': data.get('data', {}).get('info', {}),
+                'rx_count': resources.get('rx', 0),
+                'total_resources': resources.get('total', 0),
+                'last_updated': datetime.now()
             }
             
-            # Authenticate and get token data
-            auth_data = await auth_strategy.authenticate(auth_config)
-            
-            # Extract agent data
-            agent_data_list = auth_strategy.extract_agent_data(auth_data)
-            
-            # Create agents
-            await self._create_rx_team_from_data(agent_data_list)
-            
-            # Update timestamp and schedule refresh
-            self.team_manager.last_refresh_time = datetime.now()
-            self.team_manager.schedule_refresh()
-            
-            # Update references to team and x_ids for compatibility
-            self.team = self.team_manager.team
-            self.x_ids = list(self.team_manager.x_ids)
+            Logger.info(f"Updated team info: {self.team_info['rx_count']} RX agents available")
+            return self.team_info
             
         except Exception as e:
-            Logger.error(f"Authentication error: {str(e)}")
-            raise Exception("Authentication error")
+            Logger.error(f"Error fetching team info: {str(e)}")
+            return {}
 
-    def _create_rx_team(self, auth_data: dict) -> None:
-        """Create RX agents team from authentication data"""
-        try:
-            rx_agents = []
-            # Access the nested 'data' array
-            auth_data = auth_data.get('data', {})
-            if not auth_data:
-                raise ValueError("No data found in authentication response")
-            resources = auth_data.get('resources', {})
-            if not resources:
-                raise ValueError("No resources found in authentication data")
-            token_list = resources.get('rx', [])
-            if not token_list:
-                raise ValueError("No rx agent found in authentication data")
-            
-            num_agents = min(self.number_of_agents, len(token_list))
-            self.number_of_agents = len(token_list)
-            Logger.info(f"Creating RX team with {num_agents} agents")
-            self.x_ids = []
-            self.team_info = {"type":"RX", "num_agents": len(token_list)}
-            Logger.info(f"Successfully created RX team with {self.number_of_agents} agents")
-            # for idx, token_data in enumerate(token_list):
-            #     # Extract tokens and expiration
-            #     # if idx >= num_agents:
-            #     #     break
-            #     self.x_ids.append(token_data.get('x_id'))
-            #     access_token = token_data.get('access_token')
-            #     refresh_token = token_data.get('refresh_token')
-            #     followers_count = token_data.get('followers_count')
-            #     following_count = token_data.get('following_count')
-            #     tweet_count = token_data.get('tweet_count')
-            #     like_count = token_data.get('like_count')
-            #     example_post = token_data.get('example_post')
-            #     style_description = token_data.get('style_description')
-            #     x_id = token_data.get('x_id')
-            #     project_auth_token = self.authen_key
-            #     api_post = self.api_url
-            #     if not x_id or x_id =="":
-            #         Logger.warn(f"Skipping agent {idx + 1} due to missing x_id")
-            #         continue
-
-            #     agent = RXRivalzAgent(RXAgentRivalzOptions(
-            #         name=f"RX_Agent_{x_id}",
-            #         api_key=self.lead_agent.api_key,  # Use same OpenAI key as lead agent
-            #         model=self.lead_agent.model,  # Use same OpenAI model as lead agent
-            #         base_url=self.lead_agent.base_url,  # Use same OpenAI base URL as lead agent
-            #         xaccesstoken=access_token,
-            #         xrefreshtoken=refresh_token,
-            #         x_id=x_id,
-            #         followers_count=followers_count,
-            #         following_count=following_count,
-            #         tweet_count=tweet_count,
-            #         like_count=like_count,
-            #         example_post=example_post,
-            #         style_description=style_description,
-            #         project_auth_token=project_auth_token,
-            #         api_post=api_post, 
-            #         project_id=self.project_id,
-            #         inference_config={
-            #             'maxTokens': 500,
-            #             'temperature': 0.5,
-            #             'topP': 0.8,
-            #             'stopSequences': []
-            #         },
-            #         callbacks=self.callbacks,
-            #         share_global_memory=True,
-            #     ))
-            #     rx_agents.append(agent)
-            #     Logger.info(f"Created RX_Agent_{idx + 1} with access token")
-            
-            # if not rx_agents:
-            #     raise ValueError("Failed to create any RX agents from authentication data")
-
-            # self.team = rx_agents
-            # Logger.info(f"Successfully created RX team with {len(rx_agents)} agents")
+    async def fetch_rx_agents(self, num_agents: int = 1) -> List[Dict[str, Any]]:
+        """
+        Fetch detailed information of RX agents from API.
         
-        except Exception as e:
-            Logger.error(f"Error creating RX team: {str(e)}")
-            raise
-
-    def initialize(self) -> None:
-        """Initialize the supervisor with authenticated team"""
-        # Run asynchronously to work with async authentication method
-        loop = asyncio.get_event_loop()
+        Args:
+            num_agents: Number of agents to fetch
+            
+        Returns:
+            List of detailed agent information
+        """
         try:
-            loop.run_until_complete(self.authenticate_and_create_team())
+            params = {
+                'authen_key': self.authen_key,
+                'num': num_agents, 
+                'project_id': self.project_id
+            }
+            api_url = f"{self.api_url}/agent/rx"
+            Logger.info(f"Fetching RX agents from API, count: {num_agents}")
+            
+            response = requests.get(api_url, params=params)
+            
+            if response.status_code != 200:
+                Logger.error(f"Error fetching RX agents: {response.status_code} - {response.text}")
+                return []
+                
+            data = response.json()
+            agent_data = data.get('data', [])
+            
+            Logger.info(f"Successfully fetched {len(agent_data)} agents")
+            return agent_data
+            
+        except Exception as e:
+            Logger.error(f"Error fetching RX agents: {str(e)}")
+            return []
+
+    async def initialize(self) -> None:
+        """Initialize the supervisor by fetching team information."""
+        try:
+            # Directly await the fetch_team_info method
+            team_info = await self.fetch_team_info()
+            
+            if not team_info:
+                Logger.warn("Could not fetch team info, possibly due to connection error")
+            
         except Exception as e:
             Logger.error(f"Error initializing supervisor: {str(e)}")
-            # Continue with empty team
-            self.team = []
-            self.x_ids = []
-
-    def refresh_tokens(self) -> None:
-        """Refresh tokens for existing agents"""
-        Logger.info("Refreshing access tokens...")
-        
-        # Run authentication again to get fresh tokens
-        loop = asyncio.get_event_loop()
-        try:
-            loop.run_until_complete(self.authenticate_and_create_team())
-        except Exception as e:
-            Logger.error(f"Error refreshing tokens: {str(e)}")
-            # Schedule retry
-            self.team_manager.schedule_refresh(delay_minutes=5)
-
-    def __del__(self):
-        """Clean up resources when object is destroyed"""
-        self.team_manager.cleanup()
-
-    def force_token_refresh(self) -> None:
-        """Force an immediate refresh of access tokens"""
-        self.team_manager.force_refresh()
 
     async def select_agent(self, num_agents: int, content: str) -> str:
-        """Send messages to a selection of agents and get combined responses"""
+        """
+        Fetch agents from API, create temporary agents and use them to process content.
+        
+        Args:
+            num_agents: Number of agents to use
+            content: Content to process
+            
+        Returns:
+            Combined response from all agents
+        """
         Logger.info(f"Selecting agents for content processing, requested: {num_agents}")
         
         try:
-            # Use RX endpoint strategy to get fresh agents
-            self.current_auth_strategy = 'rx'
-            
-            # Authenticate and get token data
-            auth_strategy = self.auth_strategies.get(self.current_auth_strategy)
-            auth_config = {
-                'authen_key': self.authen_key, 
-                'project_id': self.project_id,
-                'api_url': self.api_url,
-                'num': num_agents
-            }
-            
-            auth_data = await auth_strategy.authenticate(auth_config)
-            agent_data_list = auth_strategy.extract_agent_data(auth_data)
+            # Fetch agent data from API
+            agent_data_list = await self.fetch_rx_agents(num_agents)
             
             if not agent_data_list:
-                Logger.error("Failed to retrieve any agents for content processing")
+                Logger.error("Could not fetch any agents for content processing")
                 return ''
             
             # Prepare base configuration for agent creation
@@ -554,17 +402,46 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
             temp_agents = []
             for agent_data in agent_data_list:
                 try:
+                    # Create basic agent
                     agent = AgentFactory.create_agent(agent_data, base_config)
+                    
+                    # Apply specialization if specified
+                    if self.agent_specialization and self.agent_specialization in ["news", "marketing", "support"]:
+                        specialized_options = RXAgentRivalzOptions(
+                            api_key=agent.client.api_key,
+                            project_auth_token=agent.project_auth_token,
+                            project_id=agent.project_id,
+                            x_id=agent.x_id,
+                            model=agent.model,
+                            base_url=agent.base_url,
+                            xaccesstoken=agent.xaccesstoken,
+                            xrefreshtoken=agent.xrefreshtoken,
+                            style_description=agent.style_description,
+                            prompt_templates=self.custom_prompt_templates,
+                            content_formatting=self.content_formatting
+                        )
+                        
+                        # Replace with specialized agent
+                        agent = RXRivalzAgent.create_specialized(
+                            self.agent_specialization, 
+                            specialized_options
+                        )
+                        
+                        # Set session ID if available
+                        if hasattr(self, 'session_id'):
+                            agent.set_session_id(self.session_id)
+                    
                     temp_agents.append(agent)
+                    
                 except Exception as e:
                     Logger.error(f"Error creating temporary agent: {str(e)}")
                     # Continue with next agent
             
             if not temp_agents:
-                Logger.error("Failed to create any temporary agents")
+                Logger.error("Could not create any temporary agents")
                 return ''
             
-            # Create tasks for processing content
+            # Create tasks to process content
             tasks = []
             for agent in temp_agents:
                 tasks.append(
@@ -591,26 +468,39 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
             Logger.error(f"Error selecting agents: {str(e)}")
             return ''
 
-    # Enhanced methods to take advantage of new RXRivalzAgent capabilities
-    
-    async def get_optimized_content(self, content: str, theme: Optional[str] = None) -> Dict[str, Any]:
+    async def optimize_content(self, content: str, theme: Optional[str] = None) -> Dict[str, Any]:
         """
-        Generate optimized content using the enhanced features
+        Optimize content using a temporary agent.
         
         Args:
-            content: Original content
-            theme: Optional content theme
+            content: Original content to optimize
+            theme: Content theme (optional)
             
         Returns:
-            Dictionary with optimized content and analysis
+            Dict containing optimized content and analysis (if available)
         """
-        if not self.team:
-            Logger.error("No agents available for content optimization")
-            return {'error': 'No agents available'}
-        
         try:
-            # Choose a random agent from the team
-            agent = random.choice(self.team)
+            # Fetch an agent from API
+            agent_data_list = await self.fetch_rx_agents(1)
+            
+            if not agent_data_list:
+                Logger.error("Could not fetch agent for content optimization")
+                return {'error': 'No agent available'}
+            
+            # Base configuration for agent
+            base_config = {
+                'api_key': self.lead_agent.api_key,
+                'model': self.lead_agent.model,
+                'base_url': self.lead_agent.base_url,
+                'project_auth_token': self.authen_key,
+                'project_id': self.project_id,
+                'api_url': self.api_url,
+                'prompt_templates': self.custom_prompt_templates,
+                'content_formatting': self.content_formatting
+            }
+            
+            # Create agent
+            agent = AgentFactory.create_agent(agent_data_list[0], base_config)
             
             # Optimize content
             optimized = agent.optimize_content_for_platform(content)
@@ -620,18 +510,17 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
                 'optimized': optimized
             }
             
-            # Add engagement analysis if enhanced mode enabled
-            if self.enhanced_content_generation:
-                try:
-                    analysis = agent.analyze_engagement_potential(optimized)
-                    result['analysis'] = analysis
-                    
-                    # Add timing suggestion if theme provided
-                    if theme:
-                        timing = agent.suggest_optimal_posting_time(theme)
-                        result['timing'] = timing
-                except Exception as e:
-                    Logger.error(f"Error during enhanced content analysis: {str(e)}")
+            # Add engagement potential analysis
+            try:
+                analysis = agent.analyze_engagement_potential(optimized)
+                result['analysis'] = analysis
+                
+                # Add timing suggestion if theme provided
+                if theme:
+                    timing = agent.suggest_optimal_posting_time(theme)
+                    result['timing'] = timing
+            except Exception as e:
+                Logger.error(f"Error analyzing content: {str(e)}")
             
             return result
             
@@ -641,7 +530,7 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
     
     async def generate_variations(self, content: str, count: int = 3) -> List[str]:
         """
-        Generate variations of content using the team
+        Generate content variations using a temporary agent.
         
         Args:
             content: Original content
@@ -650,13 +539,28 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
         Returns:
             List of content variations
         """
-        if not self.team:
-            Logger.error("No agents available for content variation")
-            return []
-        
         try:
-            # Choose a random agent
-            agent = random.choice(self.team)
+            # Fetch an agent from API
+            agent_data_list = await self.fetch_rx_agents(1)
+            
+            if not agent_data_list:
+                Logger.error("Could not fetch agent for generating content variations")
+                return []
+            
+            # Base configuration
+            base_config = {
+                'api_key': self.lead_agent.api_key,
+                'model': self.lead_agent.model,
+                'base_url': self.lead_agent.base_url,
+                'project_auth_token': self.authen_key,
+                'project_id': self.project_id,
+                'api_url': self.api_url,
+                'prompt_templates': self.custom_prompt_templates,
+                'content_formatting': self.content_formatting
+            }
+            
+            # Create agent
+            agent = AgentFactory.create_agent(agent_data_list[0], base_config)
             
             # Generate variations
             variations = await agent.generate_content_variations(content, count)
@@ -665,27 +569,117 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
         except Exception as e:
             Logger.error(f"Error generating content variations: {str(e)}")
             return []
-    
-    def set_specialization(self, specialization: Optional[str]) -> bool:
+            
+    def get_team_stats(self) -> Dict[str, Any]:
         """
-        Set specialization for the team agents
+        Return current team statistics.
+        
+        Returns:
+            Dict containing team statistics information
+        """
+        if not self.team_info:
+            return {
+                'status': 'not_initialized',
+                'rx_available': 0,
+                'last_updated': None
+            }
+            
+        time_since_update = None
+        if self.team_info.get('last_updated'):
+            time_since_update = (datetime.now() - self.team_info['last_updated']).total_seconds() / 60
+            
+        return {
+            'status': 'active',
+            'rx_available': self.team_info.get('rx_count', 0),
+            'total_resources': self.team_info.get('total_resources', 0),
+            'last_updated': self.team_info.get('last_updated'),
+            'minutes_since_update': time_since_update,
+            'swarm_level': self.team_info.get('info', {}).get('swarm_level', 'Unknown')
+        }
+
+    async def get_agents_for_tweets(self, num_agents: int = 5) -> List[RXRivalzAgent]:
+        """
+        Fetch agents from API and create temporary agents for tweet generation.
         
         Args:
-            specialization: Type of specialization (news, marketing, support, or None)
+            num_agents: Number of agents to create
             
         Returns:
-            True if successful, False otherwise
+            List of RXRivalzAgent instances ready for tweet generation
         """
-        if specialization and specialization not in ["news", "marketing", "support"]:
-            Logger.error(f"Invalid specialization: {specialization}")
-            return False
+        Logger.info(f"Creating {num_agents} agents for tweet generation")
         
-        self.agent_specialization = specialization
-        
-        # Re-initialize team with new specialization
         try:
-            self.initialize()
-            return True
+            # Fetch agent data from API
+            agent_data_list = await self.fetch_rx_agents(num_agents)
+            
+            if not agent_data_list:
+                Logger.error("Could not fetch any agents for tweet generation")
+                return []
+            
+            # Prepare base configuration for agent creation
+            base_config = {
+                'api_key': self.lead_agent.api_key,
+                'model': self.lead_agent.model,
+                'base_url': self.lead_agent.base_url,
+                'project_auth_token': self.authen_key,
+                'project_id': self.project_id,
+                'api_url': self.api_url,
+                'callbacks': self.callbacks,
+                'share_global_memory': True,
+                'session_id': self.session_id if hasattr(self, 'session_id') else None,
+                'prompt_templates': self.custom_prompt_templates,
+                'content_formatting': self.content_formatting
+            }
+            
+            # Create temporary agents for tweet generation
+            temp_agents = []
+            for agent_data in agent_data_list:
+                try:
+                    # Create basic agent
+                    agent = AgentFactory.create_agent(agent_data, base_config)
+                    temp_agents.append(agent)
+                    
+                except Exception as e:
+                    Logger.error(f"Error creating temporary agent: {str(e)}")
+                    # Continue with next agent
+            
+            if not temp_agents:
+                Logger.error("Could not create any temporary agents")
+                return []
+            
+            Logger.info(f"Successfully created {len(temp_agents)} agents for tweet generation")
+            return temp_agents
+            
         except Exception as e:
-            Logger.error(f"Error setting specialization: {str(e)}")
-            return False
+            Logger.error(f"Error getting agents for tweets: {str(e)}")
+            return []
+    
+    async def create_tweet_generator(self, num_agents: int = 5) -> Optional['TweetGenerator']:
+        """
+        Create a TweetGenerator instance with agents.
+        
+        Args:
+            num_agents: Number of agents to include in the generator
+            
+        Returns:
+            TweetGenerator instance or None if creation failed
+        """
+        try:
+            from .tweet_generator import TweetGenerator
+            
+            # Get agents
+            agents = await self.get_agents_for_tweets(num_agents)
+            
+            if not agents:
+                Logger.error("No agents available for tweet generator")
+                return None
+            
+            # Create generator
+            generator = TweetGenerator(agents)
+            
+            return generator
+            
+        except Exception as e:
+            Logger.error(f"Error creating tweet generator: {str(e)}")
+            return None

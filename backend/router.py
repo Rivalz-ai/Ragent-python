@@ -9,6 +9,7 @@ from rAgent.orchestrator import SwarmOrchestrator, OrchestratorConfig
 from rAgent.storage import InMemoryChatStorage 
 from backend.agents import create_health_agent, create_travel_agent,create_rx_supervisor, create_default_agent,create_classifier
 import re
+import asyncio
 
 from rAgent.agents import SupervisorAgent
 from rAgent.utils import Logger
@@ -30,32 +31,39 @@ Logger.info("Creating agents...")
 custom_classifier = create_classifier()
 health_agent = create_health_agent()
 travel_agent = create_travel_agent()
-
 default_agent = create_default_agent()
-# Create RX Team Supervisor
-rx_supervisor = create_rx_supervisor(storage = shared_storage, num_agents=9)
-Logger.info("All agents created successfully")
 
-# Initialize orchestrator
-Logger.info("Initializing orchestrator")
-orchestrator = SwarmOrchestrator(options=OrchestratorConfig(
-        LOG_AGENT_CHAT=True,
-        LOG_CLASSIFIER_CHAT=True,
-        LOG_CLASSIFIER_RAW_OUTPUT=True,
-        LOG_CLASSIFIER_OUTPUT=True,
-        LOG_EXECUTION_TIMES=True,
-        MAX_RETRIES=3,
-        USE_DEFAULT_AGENT_IF_NONE_IDENTIFIED=True,
-        MAX_MESSAGE_PAIRS_PER_AGENT=10
-    ),
-    classifier=custom_classifier,
-    default_agent=default_agent,
-    storage=shared_storage,
-)
+# Create a function to set up the orchestrator asynchronously
+async def setup_orchestrator():
+    # Create RX Team Supervisor with await
+    rx_supervisor = await create_rx_supervisor(storage=shared_storage, num_agents=9)
+    Logger.info("All agents created successfully")
 
-# Add all agents
-orchestrator.add_agent(rx_supervisor)
-orchestrator.add_agent(health_agent)
-orchestrator.add_agent(travel_agent)
-Logger.info("Agents added to orchestrator")
+    # Initialize orchestrator
+    Logger.info("Initializing orchestrator")
+    orchestrator = SwarmOrchestrator(options=OrchestratorConfig(
+            LOG_AGENT_CHAT=True,
+            LOG_CLASSIFIER_CHAT=True,
+            LOG_CLASSIFIER_RAW_OUTPUT=True,
+            LOG_CLASSIFIER_OUTPUT=True,
+            LOG_EXECUTION_TIMES=True,
+            MAX_RETRIES=3,
+            USE_DEFAULT_AGENT_IF_NONE_IDENTIFIED=True,
+            MAX_MESSAGE_PAIRS_PER_AGENT=10
+        ),
+        classifier=custom_classifier,
+        default_agent=default_agent,
+        storage=shared_storage,
+    )
+
+    # Add all agents
+    orchestrator.add_agent(rx_supervisor)
+    orchestrator.add_agent(health_agent)
+    orchestrator.add_agent(travel_agent)
+    Logger.info("Agents added to orchestrator")
+    
+    return orchestrator, rx_supervisor
+
+# Run the setup function using asyncio and store the results
+orchestrator, rx_supervisor = asyncio.run(setup_orchestrator())
 
