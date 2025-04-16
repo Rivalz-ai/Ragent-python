@@ -10,12 +10,16 @@ import re
 import asyncio
 import requests
 import aiohttp
-from rAgent.utils import Logger
 import logging
 # Other imports...
 
-# Set up logging to both file and console
-log_file = Logger.setup_file_logging(log_level=logging.INFO)
+# Check if file logging is already configured, if not, set it up
+if not Logger.has_file_handler():  # You'll need to add this method to the Logger class
+    log_file = Logger.setup_file_logging(log_level=logging.INFO)
+    Logger.info(f"Logging set up to file: {log_file}")
+else:
+    Logger.info("File logging already configured")
+
 from dotenv import load_dotenv
 from rAgent.orchestrator import SwarmOrchestrator, OrchestratorConfig
 from rAgent.storage import InMemoryChatStorage
@@ -37,11 +41,11 @@ async def updating_task_stats(session_id:str, project_id: str):
     async with aiohttp.ClientSession() as session:
         try:
             # Gọi API để lấy thống kê task
-            Logger.info(f"Fetching task stats... for session: {session_id}")
+            # Logger.info(f"Fetching task stats... for session: {session_id}")
             stat_url = RIVALZ_URL + f"/agent/task/rx/stats?authen_key={project_id}&thread_id={session_id}"
             async with session.get(stat_url) as response:
                 response_text = await response.text()
-                Logger.info(f"Received task stats response: {response_text}")
+                # Logger.info(f"Received task stats response: {response_text}")
                 stats = await response.json()
                 stats = stats["data"]
             # Tính toán giá trị progress
@@ -86,7 +90,7 @@ async def update_task_stats(session_id:str, project_id: str):
         try:
             # Gọi hàm cập nhật thống kê task
             await updating_task_stats(session_id, project_id)
-            Logger.info("Updated task stats")
+            # Logger.info("Updated task stats")
         except Exception as e:
             Logger.error(f"Error in background task: {e}")
         await asyncio.sleep(5)
@@ -219,10 +223,15 @@ async def start():
     cl.user_session.set("rx_supervisor", rx_supervisor)
     cl.user_session.set("shared_storage", shared_storage)
     start_message = generate_start_message(orchestrator)
+    # Add the start message to chat history
     await cl.Message(content=start_message).send()
+    chat_history = cl.user_session.get("chat_history", [])
+    chat_history.append({"role":"assistant","content": start_message})
+    cl.user_session.set("chat_history", chat_history)
+    
 
     # rx_supervisor.force_token_refresh()
-    Logger.info("Forced token refresh for RX Supervisor on session start")
+    # Logger.info("Forced token refresh for RX Supervisor on session start")
     
     Logger.info("Chat session started successfully")
 
@@ -260,7 +269,12 @@ async def main(message: cl.Message):
     user_id = cl.user_session.get("user_id")
     session_id = cl.user_session.get("session_id")
     project_id = cl.user_session.get("project_id")
-
+    history = cl.user_session.get("chat_history", [])
+    print(f"History: {history}")
+    if len(history) > 0:
+        team_info  =history[0].get("content", "No have team information")
+    else:
+        team_info = "No have team information"
     # Get the orchestrator for this specific session
     orchestrator = cl.user_session.get("orchestrator")
     if not orchestrator:
@@ -274,7 +288,8 @@ async def main(message: cl.Message):
     await msg.send()  # Send the message immediately to start streaming
     cl.user_session.set("current_msg", msg)
     try:
-        response: AgentResponse = await orchestrator.route_request(message.content, user_id, session_id, {})
+        Logger.debug(f"Team info: {team_info}")
+        response: AgentResponse = await orchestrator.route_request(message.content, user_id, session_id, {"team_info": team_info})
         Logger.info(f"Received response from orchestrator for user: {user_id} is: {response.output.content[0].get('text', '')}")
         
 
@@ -287,14 +302,27 @@ async def main(message: cl.Message):
             elif isinstance(response.output, ConversationMessage):
                 raw_output = response.output.content[0].get('text', '')
 
-            # Extract messages between <\\startagent> and <\endagent>
-            extracted_texts = re.findall(r'<\\startagent>(.*?) <\\endagent>', raw_output, re.DOTALL)
+            # Extract messages between <startagent> and <endagent>
+            extracted_texts = re.findall(r'<\\?startagent>(.*?)<\\?endagent>', raw_output, re.DOTALL)
             
+            # If nothing is extracted with the above pattern, try an alternative pattern
+            if not extracted_texts:
+                # Try alternative pattern with escaped backslashes and without space before endagent
+                extracted_texts = re.findall(r'<\\startagent>(.*?)<\\endagent>', raw_output, re.DOTALL)
+                
+            # Log the extraction results
+            Logger.info(f"Extraction result: {len(extracted_texts)} texts found")
+            if extracted_texts:
+                Logger.debug(f"First extracted text: {extracted_texts[0][:50]}...")
+
             if extracted_texts:  
                 Logger.info(f"Found {len(extracted_texts)} agent message(s) to process")
                 # ✅ Case 1: Found extracted messages → Send each one separately
                 for i,extracted_text in enumerate(extracted_texts):
                     cleaned_text = clean_text(extracted_text)
+                    if not cleaned_text:
+                        continue
+                    # Determine the author based on the content
                     author = "My Assistant"
                     if cleaned_text:
                         author = "X Assistant" if "[RX_Agent" in cleaned_text else "My Assistant"

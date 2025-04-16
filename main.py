@@ -56,8 +56,8 @@ async def main(message: cl.Message):
             elif isinstance(response.output, ConversationMessage):
                 raw_output = response.output.content[0].get('text', '')
 
-            # Extract messages between <\startagent> and <\endagent>
-            extracted_texts = re.findall(r'<\\startagent>(.*?)<\\endagent>', raw_output, re.DOTALL)
+            # Extract messages between <startagent> and <endagent>
+            extracted_texts = re.findall(r'<startagent>(.*?)<endagent>', raw_output, re.DOTALL)
             
             if extracted_texts:  
                 Logger.info(f"Found {len(extracted_texts)} agent message(s) to process")

@@ -391,23 +391,39 @@ When communicating with other agents, including the User, please follow these gu
                 task = responses.get('task', '')
                 Logger.info(f"Number of agents: {number_of_agents}, Content: {content}, Task: {task}")
                 if content == "NO" and number_of_agents == 0:
-                    return ConversationMessage(
-                    role = "assistant",
-                    content=[{"text": f"You must provide the number of agents and topic/content to process jobs {task}!"}]
+                    chat_history.append(
+                        ConversationMessage(
+                            role = "assistant",
+                            content=[{"text": f"You must provide the number of agents and topic/content to process jobs {task}!"}]
+                        )
+                    )
+                    return await self.lead_agent.process_request(
+                    input_text, user_id, session_id, chat_history, additional_params
                 )
                 elif number_of_agents == 0:
-                    return ConversationMessage(
-                    role = "assistant",
-                    content=[{"text": f"You must provide the number of agents to process jobs {task}!"}]
+                    chat_history.append(
+                        ConversationMessage(
+                            role = "assistant",
+                            content=[{"text": f"You must provide the number of agents to process jobs {task}!"}]
+                        )
+                    )
+                    return await self.lead_agent.process_request(
+                    input_text, user_id, session_id, chat_history, additional_params
                 )
                 
                 elif content == "NO":
-                    return ConversationMessage(
-                    role = "assistant",
-                    content=[{"text": f"You must provide the content to process jobs {task}!"}]
+                    chat_history.append(
+                        ConversationMessage(
+                            role = "assistant",
+                            content=[{"text": f"You must provide the content to process jobs {task}!"}]
+                        )
+                    )
+                    return await self.lead_agent.process_request(
+                    input_text, user_id, session_id, chat_history, additional_params
                 )
                 
                 responses_from_agents =  await self.select_agent(number_of_agents, f"Do the {task} with {content}")
+                
                 new_input = f"Here is the total respones from memeber Agents: {responses_from_agents}, Summarize the answers of member Agents and respond to users in a unified manner"
                 conversations = await self.lead_agent.process_request(
                     new_input, user_id, session_id, chat_history, additional_params

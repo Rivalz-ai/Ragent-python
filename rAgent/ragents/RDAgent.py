@@ -117,7 +117,7 @@ class RDAgent(Agent):
                 },
                 "interval": {
                     "type": "integer",
-                    "description": "Interval in seconds between fetches (default: 60)"
+                    "description": "Interval in seconds between fetches (default: 600)"
                 }
             },
             func=self.fetch_url,
@@ -152,7 +152,7 @@ class RDAgent(Agent):
                     "description": "Path to the data file"
                 },
                 "parameters": {
-                    "type": "object",
+                    "type": "string",
                     "description": "Additional parameters for analysis"
                 }
             },
@@ -174,7 +174,7 @@ class RDAgent(Agent):
         self.RD_tools = AgentTools(tools=[
             fetch_url_tool,
             process_json_tool,
-            analyze_data_tool,
+            # analyze_data_tool,
             get_task_stats_tool
         ])
         
@@ -193,7 +193,7 @@ class RDAgent(Agent):
         
         # Default prompt template for compute resources
         default_template = f"""
-        # Role: {{{{name}}}} - Compute Resource Administrator
+        # Role: {{{{name}}}} - Data Resource Specialist
 
         ## Agent Information
         {{{{description}}}}
@@ -205,24 +205,23 @@ class RDAgent(Agent):
         {{{{tools}}}}
         
         ## Instructions
-        - I am a specialized agent for managing and monitoring compute resources
-        - I can analyze system information and provide diagnostics
-        - I can execute verified commands on the underlying system when permitted
-        - I always verify command safety before execution
-        - I prioritize system stability and security in all operations
+        - I am a specialized agent for data collection, processing, and monitoring
+        - I can fetch data from URLs and APIs at regular intervals
+        - I can process JSON, CSV, and other structured data formats
+        - I can monitor the status of data processing tasks
         {{{{additional_instructions}}}}
         
-        ## Command Guidelines
-        - When executing commands, I first verify they are not potentially harmful
-        - I provide clear explanations about command purposes and results
-        - I recommend safer alternatives when risky commands are requested
-        - I can help diagnose system issues and suggest solutions
-        - If the resposnes from the tools have the ID information for examples (job_id,..), Please show them to the users.
+        ## Data Handling Guidelines
+        - I verify data sources before fetching information
+        - I process data using appropriate filtering techniques
+        - I provide clear explanations of processing methods and results
+        - I recommend efficient approaches for data analysis
+        - I always display task IDs (job_id, task_id) to help users track their requests
+        - I always solve the details Task  Statistics when user asks
         
         ## Response Format
-        - I provide concise, accurate information about system status
-        - For monitoring data, I present it in a clear, structured format
-        - When errors occur, I explain the likely cause and recommend fixes
+        - I present data in clear, structured formats
+        - For time-series data, I highlight trends and patterns
         - I use technical terms appropriately with explanations when needed
         - All jobs I do is post to an Queue and wait for the result.
         """
@@ -238,7 +237,7 @@ class RDAgent(Agent):
         # Set up custom variables for template
         self.custom_variables = {
             "name": self.name,
-            "description": self.description or "I am a Compute Resource Agent specialized in system monitoring, command execution, and resource management.",
+            "description": self.description or "I am a Data Resource Agent specialized in data collection, processing, and task monitoring.",
             "capabilities": capabilities,
             "tools": tools_str,
             "additional_instructions": additional_instructions
@@ -291,8 +290,7 @@ class RDAgent(Agent):
             str: A formatted string describing capabilities
         """
         capabilities = [
-            "- System health monitoring and resource utilization tracking",
-            "- System diagnostics and troubleshooting"
+            "- Task tracking",
         ]
         
         # Add tool-specific capabilities if tools exist
@@ -360,6 +358,7 @@ class RDAgent(Agent):
                 "type": 0,
                 "interval": interval,
                 "session_id": self.session_id,
+                "project_id": self.project_id,
                 "data": {
                     "url": url
                 }
@@ -404,7 +403,7 @@ class RDAgent(Agent):
                 }
             }
             
-            url_post_with_key = f"{self.api_base_url}/agent/task?authen_key={self.project_auth_token}"
+            url_post_with_key = f"{self.api_base_url}/agent/task?authen_key={self.project_auth_token}&agent_type=RD"
             Logger.info(f"Processing JSON data with query: {filter_query}")
             
             response = requests.post(url_post_with_key, json=payload)
@@ -451,7 +450,7 @@ class RDAgent(Agent):
                 "data": {"cmd": cmd}
             }
             
-            url_post_with_key = f"{self.api_base_url}/agent/task?authen_key={self.project_auth_token}"
+            url_post_with_key = f"{self.api_base_url}/agent/task?authen_key={self.project_auth_token}&agent_type=RD"
             Logger.info(f"Analyzing data with operation: {operation}")
             
             response = requests.post(url_post_with_key, json=payload)
@@ -633,7 +632,7 @@ class RDAgent(Agent):
                         tool_use = False
                     max_recursions -= 1
 
-                return ConversationMessage(role=ParticipantRole.ASSISTANT.value,  content=[{"text": f"<\\startagent>[{self.name}] {final_message}<\\endagent>"}])
+                return ConversationMessage(role=ParticipantRole.ASSISTANT.value,  content=[{"text": f"<startagent>[{self.name}] {final_message}<endagent>"}])
             else:
                 if self.streaming:
                     finish_reason, response, tool_use_blocks = await self.handle_streaming_response(request_options)
@@ -642,7 +641,7 @@ class RDAgent(Agent):
                 
                 return ConversationMessage(
                     role = ParticipantRole.ASSISTANT.value,
-                    content=[{"text": f"<\\startagent>[{self.name}] {response}<\\endagent>"}]
+                    content=[{"text": f"<startagent>[{self.name}] {response}<endagent>"}]
                 )
         except Exception as error:
             Logger.error(f"Error in OpenAI API call: {str(error)}")
