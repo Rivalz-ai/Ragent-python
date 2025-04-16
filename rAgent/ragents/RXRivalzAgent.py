@@ -271,7 +271,7 @@ class RXRivalzAgent(Agent):
         """
         default_inference_config = {
             'maxTokens': 1000,
-            'temperature': 0.2,
+            'temperature': 0,
             'topP': None,
             'stopSequences': None
         }
@@ -283,7 +283,7 @@ class RXRivalzAgent(Agent):
         """
         post_X_tool = AgentTool(
             name="tweet_to_queue",
-            description="Add a tweet to the posting queue for a specific account",
+            description="Add a tweet to the posting queue for a specific account. AFTER USING THIS TOOL, DO NOT CALL ANY MORE TOOLS AND JUST RESPOND TO THE USER.",
             properties={
                 "tweet_text": {
                     "type": "string",
@@ -298,12 +298,13 @@ class RXRivalzAgent(Agent):
             self.RX_tools.tools.extend(extra_tools.tools if isinstance(extra_tools, AgentTools) else extra_tools)
             
         if self.RX_tools.tools:
-            self.tool_config = {'tool': self.RX_tools, 'toolMaxRecursions': 2}
+            self.tool_config = {'tool': self.RX_tools, 'toolMaxRecursions': 1}  # Set to 1 to prevent multiple calls
 
     def _initialize_prompt_template(self, options: RXAgentRivalzOptions) -> None:
         """
         Initialize the system prompt template for the agent.
         """
+        tools_str = self._generate_tools_description()
         # Default prompt template with better structure
         default_template = """
         # Role: {{name}}
@@ -317,20 +318,26 @@ class RXRivalzAgent(Agent):
         ## Platform Information
         I'm a social media agent specialized for X (formerly Twitter), where content is limited to 280 characters.
         
+
+        ## Available Tools
+        {{{{tools}}}}
+
         ## Instructions
         - Provide concise, engaging responses suitable for X platform
         - Maintain the assigned personality and tone
         - Stay within character limits (280 characters)
-        - If asked to post something to X, I can use the tweet_to_queue tool
+        - When a post is successfully added to the queue, return the exact content that was posted
+        - Always show the exact content of posts that have been submitted
 
         ## Examples
         Sample post: {{example_post}}
         
-        ## Guidelines
+        ## Command Guidelines
         - Be helpful, accurate, and engaging
         - Stay on-topic and provide valuable insights
         - Use appropriate tone based on the conversation context
         - Avoid sensitive topics unless directly relevant to the query
+        - **IMPORTANT** After completing tasks involving tools related to X accounts, return the exact post content and stop then return the user for feedback or the next task.
         """
         
         # Use custom template if provided
@@ -343,6 +350,7 @@ class RXRivalzAgent(Agent):
             "description": self.description,
             "style_description": self.style_description,
             "example_post": self.example_post or "Example post not provided",
+            "tools": tools_str,
             "xaccesstoken": self.xaccesstoken
         }
         
@@ -352,6 +360,38 @@ class RXRivalzAgent(Agent):
                 options.custom_system_prompt.get('template'),
                 options.custom_system_prompt.get('variables')
             )
+    
+    def _generate_tools_description(self) -> str:
+        """
+        Generate a formatted description of all available tools.
+        
+        Returns:
+            str: A formatted string describing all tools
+        """
+        if not hasattr(self, 'RX_tools') or not self.RX_tools or not self.RX_tools.tools:
+            return "No tools available."
+            
+        tools_description = []
+        for tool in self.RX_tools.tools:
+            # Format property descriptions if available
+            properties_desc = ""
+            if hasattr(tool, 'properties') and tool.properties:
+                property_items = []
+                for prop_name, prop_info in tool.properties.items():
+                    prop_type = prop_info.get('type', 'string')
+                    prop_desc = prop_info.get('description', '')
+                    property_items.append(f"    - {prop_name} ({prop_type}): {prop_desc}")
+                
+                if property_items:
+                    properties_desc = "\n" + "\n".join(property_items)
+            
+            # Use func_description instead of description
+            tool_desc = tool.func_description if hasattr(tool, 'func_description') else "No description available"
+            
+            # Add the tool description
+            tools_description.append(f"- {tool.name}: {tool_desc}{properties_desc}")
+            
+        return "\n".join(tools_description)
 
     def post_to_X(self, tweet_text: str) -> str:
         """
@@ -375,7 +415,7 @@ class RXRivalzAgent(Agent):
             
             # Extract job ID and return success message
             job_id = response_data.get('data', {}).get('job_id')
-            return f"ADDED to Queues with ID {job_id}. You can check its status in the sidebar."
+            return f"ADDED to Queues with ID {job_id} and content {content}. You can check its status in the sidebar."
         except Exception as e:
             Logger.error(f"Error queueing post: {str(e)}")
             return f"Error adding tweet to queue: {str(e)}"
@@ -427,7 +467,7 @@ class RXRivalzAgent(Agent):
         
         # Make LLM call
         response = self.client.chat.completions.create(
-            model='gpt-4o',
+            model='gpt-4.1',
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Paraphrase or generate a new post with approximately {number_words} words that's under 280 characters:\n\n\"\"\"{content}\"\"\""}
@@ -450,7 +490,7 @@ class RXRivalzAgent(Agent):
         """
         
         return self.client.chat.completions.create(
-            model='gpt-4o',
+            model='gpt-4.1',
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "assistant", "content": response},
@@ -535,43 +575,75 @@ class RXRivalzAgent(Agent):
                 request_options['tools'] = tools
                 # Handle tool calling recursively
                 final_message = ''
-                tool_use =True
-                max_recursions = self.tool_config.get('toolMaxRecursions', self.default_max_recursions)
+                tool_use = True
+                max_recursions = 1  # Force limit to 1 regardless of config
+                tool_was_used = False  # Track if a tool was used
                 time_step_call = 0
+                
                 while tool_use and max_recursions > 0:
-                    time_step_call +=1
+                    time_step_call += 1
+                    
                     if self.streaming:
-                        #Logger.info(f"Handling streaming response, request_options: {request_options}")
                         finish_reason, response, tool_use_blocks = await self.handle_streaming_response(request_options)
-                        Logger.info(f"the response is : {finish_reason, response}")
+                        Logger.info(f"Streaming response: {finish_reason}")
                     else:
-                        Logger.info(f"Calling tool use for the {time_step_call} times")
+                        Logger.info(f"Calling tool use for the {time_step_call} time")
                         finish_reason, response, tool_use_blocks = await self.handle_single_response(request_options)
-                        Logger.info(f"Response: {finish_reason, response, tool_use_blocks}")
+                        Logger.info(f"Response finish reason: {finish_reason}")
+                    
                     responses = finish_reason, response, tool_use_blocks
+                    
                     if tool_use_blocks:
+                        tool_was_used = True  # Mark that a tool was used
                         if response:
                             request_options['messages'].append({"role": "assistant", "content": response})
+                        
                         if not self.tool_config:
                             raise ValueError("No tools available for tool use")
+                        
                         if self.tool_config.get('useToolHandler'):
                             tool_response = self.tool_config['useToolHandler'](responses, request_options['messages'])
                         else:
-                            tools:AgentTools = self.tool_config["tool"]
+                            tools = self.tool_config["tool"]
                             if self.base_url:
                                 tool_response = await tools.tool_handler(AgentProviderType.DEEPINFRA.value, tool_use_blocks, request_options['messages'])
                             else:
                                 tool_response = await tools.tool_handler(AgentProviderType.OPENAI.value, tool_use_blocks, request_options['messages'])
+                        
                         Logger.info(f"Tool response: {tool_response}")
                         request_options['messages'].extend(tool_response)
-                        tool_use = True
+                        
+                        # Get a final response and then exit the loop
+                        tool_use = False  # Force exit after one tool use
+                        
+                        # Add a system message to prevent further tool calls
+                        request_options['messages'].append({
+                            "role": "system",
+                            "content": "DO NOT USE ANY MORE TOOLS. The requested task has been completed. Respond directly to the user with a confirmation and ask what else they would like to do."
+                        })
+                        
+                        # Get final response from the LLM
+                        final_response = self.client.chat.completions.create(
+                            model=request_options["model"],
+                            messages=request_options["messages"],
+                            temperature=request_options["temperature"],
+                            max_tokens=150,
+                            tools=None  # Remove tools to prevent calling
+                        )
+                        
+                        final_message = final_response.choices[0].message.content
                     else:
                         final_message = response if response else ""
-                    if finish_reason != 'tool_calls':
+                        
+                    if finish_reason != 'tool_calls' or tool_was_used:
                         tool_use = False
+                        
                     max_recursions -= 1
 
-                return ConversationMessage(role=ParticipantRole.ASSISTANT.value,  content=[{"text": f"<\\startagent>[{self.name}] {final_message}<\\endagent>"}])
+                return ConversationMessage(
+                    role=ParticipantRole.ASSISTANT.value,  
+                    content=[{"text": f"<startagent>[{self.name}] {final_message}<endagent>"}]
+                )
             else:
                 if self.streaming:
                     finish_reason, response, tool_use_blocks = await self.handle_streaming_response(request_options)
@@ -580,7 +652,7 @@ class RXRivalzAgent(Agent):
                 
                 return ConversationMessage(
                     role = ParticipantRole.ASSISTANT.value,
-                    content=[{"text": f"<\\startagent>[{self.name}] {response}<\\endagent>"}]
+                    content=[{"text": f"<startagent>[{self.name}] {response}<endagent>"}]
                 )
         except Exception as error:
             Logger.error(f"Error in OpenAI API call: {str(error)}")
@@ -738,7 +810,7 @@ class RXRivalzAgent(Agent):
     def generate_keywords(self, content:str) -> str:
         prompt = str("Generate 10 topic (each topic <3 words) for the following content:\n\n " + content) 
         response =  self.client.chat.completions.create(
-            model='gpt-4o',
+            model='gpt-4.1',
             messages=[
             {"role": "system", "content": "Provide output in valid JSON format. The data should be like this ." +json.dumps({"keywords": ["keyword1", "keyword2", "keyword3"]})},
             {"role": "user", "content": prompt},
@@ -757,7 +829,8 @@ class RXRivalzAgent(Agent):
     
     def generate_description(self)->str:
         if self.description is None and self.followers_count is not None:
-            default = f"""Social media (Twitter/X) agent with X_ID is {self.x_id}.\n\n
+            default = f"""
+                        Social media (Twitter/X) agent with X_ID is {self.x_id}.\n\n
                         The agent has {self.followers_count} followers, follows {self.following_count} accounts, and has made {self.tweet_count} tweets.\n\n
                         The agent has liked {self.like_count} tweets and has an example post that reads: {self.example_post}.\n\n"""
             
@@ -826,7 +899,7 @@ class RXRivalzAgent(Agent):
             """
             
             response = self.client.chat.completions.create(
-                model='gpt-4o',
+                model='gpt-4.1',
                 messages=[
                     {"role": "system", "content": "You are a social media optimization expert specializing in X platform."},
                     {"role": "user", "content": platform_prompt}
@@ -875,7 +948,7 @@ class RXRivalzAgent(Agent):
         """
         
         response = self.client.chat.completions.create(
-            model='gpt-4o',
+            model='gpt-4.1',
             messages=[
                 {"role": "system", "content": f"You are a social media content creator for an account with this description: {description}"},
                 {"role": "user", "content": variations_prompt}
@@ -936,7 +1009,7 @@ class RXRivalzAgent(Agent):
         """
         
         response = self.client.chat.completions.create(
-            model='gpt-4o',
+            model='gpt-4.1',
             messages=[
                 {"role": "system", "content": "You are a social media analytics expert. Respond in JSON format with numeric scores and brief text analysis."},
                 {"role": "user", "content": analysis_prompt}
@@ -982,7 +1055,7 @@ class RXRivalzAgent(Agent):
         """
         
         response = self.client.chat.completions.create(
-            model='gpt-4o',
+            model='gpt-4.1',
             messages=[
                 {"role": "system", "content": "You are a social media timing optimization expert. Respond in JSON format."},
                 {"role": "user", "content": time_prompt}

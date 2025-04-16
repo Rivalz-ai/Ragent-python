@@ -112,6 +112,8 @@ class OpenAIAgent(Agent):
             system_prompt = self.system_prompt
 
             global_history = []
+            if additional_params and 'team_info' in additional_params:
+                team_info = additional_params['team_info']
             if self.share_global_memory and additional_params and 'global_history' in additional_params:
                 global_history = additional_params['global_history']
                 Logger.info(f"Global history: {global_history}")
@@ -127,7 +129,9 @@ class OpenAIAgent(Agent):
                             content = msg.content[0].get('text', '') if msg.content else ''
                             global_context += f"{msg.role}: {content}\n"
                 system_prompt += global_context
-            
+            if team_info:
+                system_prompt += f"\n\nTEAM CONTEXT:\n{team_info}"
+
             if self.retriever:
                 response = await self.retriever.retrieve_and_combine_results(input_text)
                 context_prompt = "\nHere is the context to use to answer the user's question:\n" + response
@@ -193,7 +197,7 @@ class OpenAIAgent(Agent):
                         tool_use = False
                     max_recursions -= 1
 
-                return ConversationMessage(role=ParticipantRole.ASSISTANT.value, content=[{"text": f"<\startagent>[{self.name}] {final_message}<\endagent>"}])
+                return ConversationMessage(role=ParticipantRole.ASSISTANT.value, content=[{"text": f"<startagent>[{self.name}] {final_message}<endagent>"}])
             else:
                 if self.streaming:
                     finish_reason, response, tool_use_blocks = await self.handle_streaming_response(request_options)
@@ -202,7 +206,7 @@ class OpenAIAgent(Agent):
                 
                 return ConversationMessage(
                     role = ParticipantRole.ASSISTANT.value,
-                    content=[{"text": f"<\startagent>[{self.name}] {response}<\endagent>"}]
+                    content=[{"text": f"<startagent>[{self.name}] {response}<endagent>"}]
                 )
         except Exception as error:
             Logger.error(f"Error in OpenAI API call: {str(error)}")

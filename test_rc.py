@@ -76,34 +76,44 @@ async def updating_task_stats(session_id: str, project_id: str):
             # Prepare completed tasks list with formatted resource details
             completed_tasks = []
             for task_info in stats.get("list_result_done", []):
-                task_data = task_info.get("data", {})
-                if task_data:
-                    # Format resource data for display
-                    resource_summary = ""
+                if type(task_info.get("data")) == str:
+                    # Format string data replacing newlines with HTML break tags
+                    raw_data = task_info.get("data")
+                    # Check if the string contains newlines
+                    if "\n" in raw_data:
+                        # Replace newlines with HTML line breaks for proper display
+                        resource_summary = raw_data.replace("\n", "<br/>")
+                    else:
+                        resource_summary = raw_data
                     
-                    # CPU info
-                    cpu_info = task_data.get("cpu", {})
-                    if cpu_info:
-                        cpu_usage = cpu_info.get("usage", 0)
-                        resource_summary += f"CPU: {cpu_usage:.1f}% | "
+                else:
+                    task_data = task_info.get("data", {})
+                    if task_data:
+                        # Format resource data for display
+                        resource_summary = ""
+                        # CPU info
+                        cpu_info = task_data.get("cpu", {})
+                        if cpu_info:
+                            cpu_usage = cpu_info.get("usage", 0)
+                            resource_summary += f"CPU: {cpu_usage:.1f}% | "
+                        
+                        # RAM info
+                        ram_info = task_data.get("ram", {})
+                        if ram_info:
+                            ram_percent = ram_info.get("used_percent", 0)
+                            resource_summary += f"RAM: {ram_percent:.1f}% | "
+                        
+                        # Disk info
+                        disk_info = task_data.get("disk", {})
+                        if disk_info:
+                            disk_percent = disk_info.get("used_percent", 0)
+                            resource_summary += f"Disk: {disk_percent:.1f}%"
+                        
+                        # Create a readable ID for the task
+                task_id = task_info.get("task_id", "Unknown")
+                agent_id = task_info.get("id", "Unknown")
                     
-                    # RAM info
-                    ram_info = task_data.get("ram", {})
-                    if ram_info:
-                        ram_percent = ram_info.get("used_percent", 0)
-                        resource_summary += f"RAM: {ram_percent:.1f}% | "
-                    
-                    # Disk info
-                    disk_info = task_data.get("disk", {})
-                    if disk_info:
-                        disk_percent = disk_info.get("used_percent", 0)
-                        resource_summary += f"Disk: {disk_percent:.1f}%"
-                    
-                    # Create a readable ID for the task
-                    task_id = task_info.get("task_id", "Unknown")
-                    agent_id = task_info.get("id", "Unknown")
-                    
-                    completed_tasks.append({
+                completed_tasks.append({
                         "id": task_id,
                         "data": resource_summary,
                         "agent_id": agent_id,

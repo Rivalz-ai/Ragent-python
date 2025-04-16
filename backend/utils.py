@@ -40,14 +40,24 @@ def generate_start_message(orchestrator: SwarmOrchestrator) -> str:
 
 def clean_text(extracted_text: str) -> str:
     """Clean the extracted text by removing tags and ensuring only one instance of [AgentName]."""
-    # Remove all occurrences of <\startagent> and <\endagent>
-    cleaned_text = re.sub(r'<\\startagent>|<\\endagent>', '', extracted_text)
+    # Remove all occurrences of <startagent> and <endagent>
+    cleaned_text = re.sub(r'<startagent>|<endagent>', '', extracted_text)
     # Ensure only one instance of [AgentName]
     agent_name_match = re.search(r'\[([^\]]+)\]', cleaned_text)
+    
     if agent_name_match:
         agent_name = agent_name_match.group(0)
+        # Check if the cleaned text only contains the agent name
+        remaining_text = re.sub(r'\[([^\]]+)\]', '', cleaned_text).strip()
+        
+        # If there's no content besides the agent name, return None
+        if not remaining_text:
+            return None
+            
+        # Otherwise, format with agent name at the beginning
         cleaned_text = re.sub(r'\[([^\]]+)\]', '', cleaned_text)
         cleaned_text = agent_name + " " + cleaned_text
+        
     return cleaned_text.strip()
 
 

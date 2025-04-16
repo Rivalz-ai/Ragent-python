@@ -272,7 +272,7 @@ class RXAgent(Agent):
                         tool_use = False
                     max_recursions -= 1
 
-                return ConversationMessage(role=ParticipantRole.ASSISTANT.value,  content=[{"text": f"<\startagent>[{self.name}] {final_message}<\endagent>"}])
+                return ConversationMessage(role=ParticipantRole.ASSISTANT.value,  content=[{"text": f"<startagent>[{self.name}] {final_message}<endagent>"}])
             else:
                 if self.streaming:
                     finish_reason, response, tool_use_blocks = await self.handle_streaming_response(request_options)
@@ -281,7 +281,7 @@ class RXAgent(Agent):
                 
                 return ConversationMessage(
                     role = ParticipantRole.ASSISTANT.value,
-                    content=[{"text": f"<\startagent>[{self.name}] {response}<\endagent>"}]
+                    content=[{"text": f"<startagent>[{self.name}] {response}<endagent>"}]
                 )
         except Exception as error:
             Logger.error(f"Error in OpenAI API call: {str(error)}")

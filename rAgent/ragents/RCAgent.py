@@ -499,7 +499,7 @@ class RCAgent(Agent):
             }
             
             # Make the API request
-            url_post_with_key = f"{self.api_base_url}/agent/task?authen_key={self.project_auth_token}"
+            url_post_with_key = f"{self.api_base_url}/agent/task?authen_key={self.project_auth_token}&agent_type=RC"
             Logger.info(f"Executing command via {url_post_with_key}: {command}")
             
             response = requests.post(url_post_with_key, json=payload)
@@ -623,7 +623,7 @@ class RCAgent(Agent):
                         tool_use = False
                     max_recursions -= 1
 
-                return ConversationMessage(role=ParticipantRole.ASSISTANT.value,  content=[{"text": f"<\\startagent>[{self.name}] {final_message}<\\endagent>"}])
+                return ConversationMessage(role=ParticipantRole.ASSISTANT.value,  content=[{"text": f"<startagent>[{self.name}] {final_message}<endagent>"}])
             else:
                 if self.streaming:
                     finish_reason, response, tool_use_blocks = await self.handle_streaming_response(request_options)
@@ -632,7 +632,7 @@ class RCAgent(Agent):
                 
                 return ConversationMessage(
                     role = ParticipantRole.ASSISTANT.value,
-                    content=[{"text": f"<\\startagent>[{self.name}] {response}<\\endagent>"}]
+                    content=[{"text": f"<startagent>[{self.name}] {response}<endagent>"}]
                 )
         except Exception as error:
             Logger.error(f"Error in OpenAI API call: {str(error)}")
@@ -746,7 +746,7 @@ class RCAgent(Agent):
             }
             
             # Make the API request
-            url_post_with_key = f"{self.api_base_url}/agent/task?authen_key={self.project_auth_token}"
+            url_post_with_key = f"{self.api_base_url}/agent/task?authen_key={self.project_auth_token}&agent_type=RC"
             Logger.info(f"Checking service status via {url_post_with_key}: {service_name}")
             
             response = requests.post(url_post_with_key, json=payload)
@@ -789,7 +789,7 @@ class RCAgent(Agent):
             }
             
             # Make the API request
-            url_post_with_key = f"{self.api_base_url}/agent/task?authen_key={self.project_auth_token}"
+            url_post_with_key = f"{self.api_base_url}/agent/task?authen_key={self.project_auth_token}&agent_type=RC"
             Logger.info(f"Listing processes via {url_post_with_key}")
             
             response = requests.post(url_post_with_key, json=payload)

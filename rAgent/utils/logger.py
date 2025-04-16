@@ -43,40 +43,38 @@ class Logger:
         """Set a custom logger."""
         cls._logger = logger
 
-    @classmethod
-    def setup_file_logging(cls, log_level=logging.INFO, log_dir="logs"):
-        """Set up logging to write to both file and console."""
-        # Create logs directory if it doesn't exist
+    @staticmethod
+    def has_file_handler():
+        """Check if the root logger already has a FileHandler."""
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers:
+            if isinstance(handler, logging.FileHandler):
+                return True
+        return False
+
+    @staticmethod
+    def setup_file_logging(log_level=logging.INFO, log_dir="logs"):
+        """Set up file logging only if no file handler exists already."""
+        if Logger.has_file_handler():
+            # Get the path of the existing file handler
+            root_logger = logging.getLogger()
+            for handler in root_logger.handlers:
+                if isinstance(handler, logging.FileHandler):
+                    return handler.baseFilename
+                    
+        # Original file logging setup code
         os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, "rivalz_app.log")
         
-        # Generate timestamp for unique log file
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = os.path.join(log_dir, f"ragent_{timestamp}.log")
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(log_level)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
         
-        # Configure the logger
-        logger = cls.get_logger()
-        logger.setLevel(log_level)
+        # Add file handler to root logger
+        root_logger = logging.getLogger()
+        root_logger.addHandler(file_handler)
         
-        # Remove existing handlers if present
-        if cls._file_handler:
-            logger.removeHandler(cls._file_handler)
-        if cls._console_handler:
-            logger.removeHandler(cls._console_handler)
-        
-        # File handler
-        cls._file_handler = logging.FileHandler(log_file)
-        file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        cls._file_handler.setFormatter(file_formatter)
-        logger.addHandler(cls._file_handler)
-        
-        # Console handler (if not already attached)
-        cls._console_handler = logging.StreamHandler()
-        console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        cls._console_handler.setFormatter(console_formatter)
-        logger.addHandler(cls._console_handler)
-        
-        # Log the configuration
-        logger.info(f"Logging configured to file: {log_file}")
         return log_file
 
     # Message formatting
