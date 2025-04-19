@@ -54,6 +54,8 @@ async def start():
     cl.user_session.set("user_id", str(uuid.uuid4()))
     cl.user_session.set("session_id", str(uuid.uuid4()))
 
+
+
 @cl.on_message
 async def handle_message(message: cl.Message):
     user_id = cl.user_session.get("user_id")

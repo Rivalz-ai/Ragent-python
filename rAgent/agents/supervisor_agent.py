@@ -453,18 +453,34 @@ When communicating with other agents, including the User, please follow these gu
     
     def num_agent(self, chat_history, input_text):
         
-        messages = [{"role": "system", "content": "Extract the task what agent do and Decide number of member agents in team, and the information for member Agent doing task that lead agent should send the message to, if context not provided number or content for doing task, return " + json.dumps({"task":"the task","number": 0, "content":"NO"}) + "\n. Provide output in valid JSON format. The data should be like this ." + json.dumps({"task":"the task","number": "num_agents", "content":"the content for member agent doing task"}) + "CHECK ALL THE CHAT HISTORY TO CHOOSE **THE NUMBER OF AGENT** AND **CONTENT**. If the last 3 messages do not mention the number of agents explicitly, return 0 for the number of agents without inferring."}] + [
-            {"role": "user" if msg.role == ParticipantRole.USER.value else "assistant",
-             "content": msg.content[0]['text'] if msg.content else ''} for msg in chat_history
-        ]
+        # Create messages array with system prompt for intent extraction
+        system_prompt = (
+            "Extract the following information from the user's request:\n"
+            "1. task: What task needs to be performed\n"
+            "2. number: How many agents should process the task (integer)\n" 
+            "3. content: What content should be processed\n\n"
+            "Return in valid JSON format like: " + 
+            json.dumps({"task": "the task", "number": 0, "content": "the content"}) + 
+            "\n\nIf content isn't specified, set content to 'NO'.\n"
+            "IMPORTANT: Review 3 latest chat history to determine the NUMBER OF AGENTS and CONTENT.\n"
+            "If the number of agents isn't explicitly mentioned in recent messages, return 0."
+        )
+        
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Add chat history messages
+        for msg in chat_history:
+            role = "user" if msg.role == ParticipantRole.USER.value else "assistant"
+            content = msg.content[0]['text'] if msg.content else ''
+            messages.append({"role": role, "content": content})
         
         messages.append({"role": "user", "content": input_text})
         response =  self.lead_agent.client.chat.completions.create(
-            model='gpt-4o',
+            model='gpt-4.1',
             messages=messages,
             response_format={"type":"json_object"},
             max_tokens=768,
-            temperature=0,
+            temperature=0.1,
             timeout=20,
         ).choices[0].message.content
         try:
