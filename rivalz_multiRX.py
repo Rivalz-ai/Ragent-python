@@ -4,6 +4,7 @@ from rAgent.utils import Logger
 import uuid
 from rAgent.types import ConversationMessage
 import os
+from chainlit.user import PersistedUser, User
 from backend.utils import generate_start_message, clean_text
 from rAgent.agents import AgentResponse
 import re
@@ -12,7 +13,7 @@ import requests
 import aiohttp
 import logging
 # Other imports...
-
+from chainlit.types import ThreadDict
 # Check if file logging is already configured, if not, set it up
 if not Logger.has_file_handler():  # You'll need to add this method to the Logger class
     log_file = Logger.setup_file_logging(log_level=logging.INFO)
@@ -38,14 +39,17 @@ polling_active = True
 
 
 async def updating_task_stats(session_id:str, project_id: str):
+    total = 0
+    num_failed = 0
+    num_done = 0
     async with aiohttp.ClientSession() as session:
         try:
             # Gọi API để lấy thống kê task
-            # Logger.info(f"Fetching task stats... for session: {session_id}")
-            stat_url = RIVALZ_URL + f"/agent/task/rx/stats?authen_key={project_id}&thread_id={session_id}"
+            Logger.info(f"Fetching task stats... for session: {session_id}")
+            stat_url = RIVALZ_URL + f"/api/v2/agent/task/rx/stats?authen_key={project_id}&thread_id={session_id}"
             async with session.get(stat_url) as response:
                 response_text = await response.text()
-                # Logger.info(f"Received task stats response: {response_text}")
+                Logger.info(f"Received task stats response: {response_text}")
                 stats = await response.json()
                 stats = stats["data"]
             # Tính toán giá trị progress
@@ -60,7 +64,9 @@ async def updating_task_stats(session_id:str, project_id: str):
                 if tweet_info["data"] is None:
                     tweet_info["data"] = "0"
                 completed_links.append(f"https://twitter.com/i/web/status/{tweet_info['data']}")
-            
+            total = stats["total_tasks"]
+            num_failed = stats["failed"]
+            num_done = stats["done"]
             # Cập nhật sidebar với progress bar
             await cl.ElementSidebar.set_elements([
                 cl.CustomElement(
@@ -82,6 +88,7 @@ async def updating_task_stats(session_id:str, project_id: str):
             ])
         except Exception as e:
             Logger.error(f"Error updating task stats: {e}")
+    return int(total) == int(num_done) + int(num_failed)
 
 async def update_task_stats(session_id:str, project_id: str):
     """Background task để cập nhật thống kê task trên sidebar"""
@@ -89,7 +96,10 @@ async def update_task_stats(session_id:str, project_id: str):
     while polling_active:
         try:
             # Gọi hàm cập nhật thống kê task
-            await updating_task_stats(session_id, project_id)
+            done = await updating_task_stats(session_id, project_id)
+            if done == True:
+                Logger.info("All tasks done")
+                break
             # Logger.info("Updated task stats")
         except Exception as e:
             Logger.error(f"Error in background task: {e}")
@@ -181,6 +191,74 @@ async def header_auth_callback(headers: Dict) -> Optional[User]:
 #         )
 #     else:
 #         return None
+@cl.on_chat_resume
+async def on_chat_resume(thread: ThreadDict):
+    cl.user_session.set("chat_history", [])
+    
+    for message in thread["steps"]:
+        if message["type"] == "user_message":
+            cl.user_session.get("chat_history").append({"role": "user", "content": message["output"]})
+        elif message["type"] == "assistant_message":
+            cl.user_session.get("chat_history").append({"role": "assistant", "content": message["output"]})
+    
+    user = cl.user_session.get("user")
+    print(f"User: {user}")
+    # Extract project info from user metadata
+    project_id = None
+    Logger.info(f"User is {user}")    
+    if user and user.metadata:
+        project_id = user.metadata.get("project_id")
+        Logger.info(f"Project ID from user metadata: {project_id}")
+    else:
+        raise ValueError("User metadata is not available or does not contain project_id")
+    # Log what we found
+    if project_id:
+        cl.user_session.set("project_id", project_id)
+        Logger.info(f"Starting chat with project_id: {project_id}")
+    else:
+        await cl.Message(content="No project ID provided. Please select a project from the main page.").send()
+        Logger.error("No project ID found in user session")
+        return
+
+
+
+    # Initialize orchestrator and rx_supervisor with project_id
+    # Replace auth_key with project_id
+    shared_storage = InMemoryChatStorage()
+    orchestrator,rx_supervisor = await start_orchestrator(project_id,shared_storage)
+    # Store the orchestrator and rx_supervisor in the user session
+    cl.user_session.set("orchestrator", orchestrator)
+    cl.user_session.set("rx_supervisor", rx_supervisor)
+    cl.user_session.set("shared_storage", shared_storage)
+
+    # Initialize sidebar with empty progress bar
+    elements = [
+        cl.CustomElement(
+            name="CustomProgressBar", 
+            props={
+                "value": 0,  
+                "title": "RX Post Tasks",                
+                "progressName": "Posted 0/0",
+                "details": {                            
+                    "total": 0,
+                    "done": 0,
+                    "failed": 0, 
+                    "pending": 0
+                },
+                "completedLinks": []  
+            }
+        ),
+    ]
+    await cl.ElementSidebar.set_elements(elements)
+    await cl.ElementSidebar.set_title("Task Progress")
+    Logger.info("Initialized sidebar with empty progress bar")
+
+    global polling_active
+    polling_active = True
+    Logger.warn(f"continues with { thread['id']}")
+    asyncio.create_task(update_task_stats(thread['id'], project_id))
+    Logger.info("Started background task for updating task statistics")
+    Logger.info(f"Chat resumed previous messages")
 
 
 
@@ -208,10 +286,17 @@ async def start():
         return
 
     Logger.info("New chat session starting")
-    user_id = str(uuid.uuid4())
-    session_id = str(uuid.uuid4())
-    cl.user_session.set("user_id", user_id)
-    cl.user_session.set("session_id", session_id)
+
+    session_id = cl.user_session.get("id")
+    Logger.info(f"session_id is {session_id}")
+    if type(cl.user_session.get("user")) == PersistedUser:
+        user_id = user.id
+        Logger.info(f"User is {user_id}")
+        cl.user_session.set("user_id", user_id)
+    else:
+        user_id = str(uuid.uuid4())
+        cl.user_session.set("user_id", user_id)
+
     cl.user_session.set("chat_history", [])
 
     # Initialize orchestrator and rx_supervisor with project_id
@@ -257,17 +342,23 @@ async def start():
     await cl.ElementSidebar.set_title("Task Progress")
     Logger.info("Initialized sidebar with empty progress bar")
 
-    global polling_active
-    polling_active = True
-    asyncio.create_task(update_task_stats(session_id, project_id))
-    Logger.info("Started background task for updating task statistics")
+    # global polling_active
+    # polling_active = True
+    # asyncio.create_task(updating_task_stats(session_id, project_id))
+    # Logger.info("Started background task for updating task statistics")
 
 
 
 @cl.on_message
 async def main(message: cl.Message):
+    thread_id = cl.context.session.thread_id
+    print(f"Thread ID: {thread_id}")
     user_id = cl.user_session.get("user_id")
-    session_id = cl.user_session.get("session_id")
+    session_id = cl.user_session.get("id")
+    # thread_id = message.thread.id
+    print(f"Session ID: {session_id}")
+
+    
     project_id = cl.user_session.get("project_id")
     history = cl.user_session.get("chat_history", [])
     print(f"History: {history}")
@@ -281,7 +372,7 @@ async def main(message: cl.Message):
         await cl.Message(content="Session expired. Please refresh the page.").send()
         return
 
-    Logger.info(f"Processing message for user: {user_id}, session: {session_id}")
+    Logger.info(f"Processing message for user: {user_id}, thread id: {thread_id}")
     Logger.debug(f"Message content: {message.content[:50]}...")
 
     msg = cl.Message(content="", author="My Assistant")
@@ -289,7 +380,7 @@ async def main(message: cl.Message):
     cl.user_session.set("current_msg", msg)
     try:
         Logger.debug(f"Team info: {team_info}")
-        response: AgentResponse = await orchestrator.route_request(message.content, user_id, session_id, {"team_info": team_info})
+        response: AgentResponse = await orchestrator.route_request(message.content, user_id, thread_id, {"team_info": team_info})
         Logger.info(f"Received response from orchestrator for user: {user_id} is: {response.output.content[0].get('text', '')}")
         
 
@@ -346,7 +437,7 @@ async def main(message: cl.Message):
                 msg.author = author
                 await msg.stream_token(cleaned_text)
                 await msg.update() # Finalize the message
-        asyncio.create_task(updating_task_stats(session_id, project_id))
+        asyncio.create_task(update_task_stats(thread_id, project_id))
     except Exception as e:
         Logger.error(f"Error processing message: {e}")
         await msg.stream_token("An error occurred while processing your request. Please try again later.")

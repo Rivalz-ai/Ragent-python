@@ -33,7 +33,7 @@ DEEP_INFRA_URL = os.getenv("base_url")
 DEEP_INFRA_MODEL= os.getenv("deep_infra_model")
 PROJECT_AUTH_TOKEN = os.getenv("auth_key", "test_token")
 PROJECT_ID = os.getenv("PROJECT_ID", "test_project")
-RIVALZ_URL = os.getenv("RIVAL_URL", "https://staging-rome-api-v2.rivalz.ai/agent")
+RIVALZ_URL = os.getenv("RIVAL_URL", "https://staging-rome-api-v2.rivalz.ai")
 
 async def updating_task_stats(session_id: str, project_id: str):
     """Update task statistics in the sidebar"""
@@ -42,7 +42,7 @@ async def updating_task_stats(session_id: str, project_id: str):
             # Call API to get task statistics
             Logger.info(f"Fetching RD task stats for session: {session_id}")
             # Uses the rd endpoint instead of rc
-            stat_url = f"{RIVALZ_URL}/agent/task/rd/stats?authen_key={project_id}&thread_id={session_id}"
+            stat_url = f"{RIVALZ_URL}/api/v2/agent/task/rd/stats?authen_key={project_id}&thread_id={session_id}"
             
             Logger.info(f"Requesting stats from URL: {stat_url}")
             
