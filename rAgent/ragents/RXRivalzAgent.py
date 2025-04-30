@@ -136,7 +136,7 @@ class RXAgentRivalzOptions(AgentOptions):
     retriever: Optional[Retriever] = None
     client: Optional[Any] = None
     extra_tools: Optional[Union[AgentTools, list[AgentTool]]] = None
-    default_max_recursions: int = 2
+    default_max_recursions: int = 5
     
     # X API configuration
     xaccesstoken: Optional[str] = None
