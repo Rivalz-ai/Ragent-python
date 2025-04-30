@@ -5,7 +5,9 @@ import logging
 import asyncio
 import aiohttp
 from dotenv import load_dotenv
-
+from rAgent.agents import (Agent,
+                        AgentResponse,
+                        AgentProcessingResult)
 # Import agent types and options
 from rAgent.ragents import RCAgent, RCAgentOptions
 from rAgent.ragents import RDAgent, RDAgentOptions
@@ -25,6 +27,40 @@ from rAgent.storage import InMemoryChatStorage
 from backend.agents import create_health_agent, create_travel_agent, create_rx_supervisor, create_default_agent,create_classifier 
 # Load environment variables
 load_dotenv()
+import chainlit as cl
+
+from rAgent.agents import AgentCallbacks
+
+class ChainlitAgentCallbacks(AgentCallbacks):
+    def __init__(self):
+        self.is_streaming = False
+    def on_llm_new_token(self, token: str) -> None:
+        try:
+            self.is_streaming = True
+            loop = asyncio.get_event_loop()
+            if not loop.is_running():
+                asyncio.run(cl.user_session.get("current_msg").stream_token(token))
+            else:
+                # Chỉ sử dụng MỘT trong hai cách sau, không dùng cả hai:
+                loop.create_task(cl.user_session.get("current_msg").stream_token(token))
+                # KHÔNG gọi cả hai dòng - xóa hoặc comment dòng dưới đây
+                # future = asyncio.ensure_future(cl.user_session.get("current_msg").stream_token(token))
+        except Exception as e:
+            print(f"Error streaming token: {e}")
+
+    def on_llm_end(self) -> None:
+        """Called when LLM streaming ends to finalize the message"""
+        try:
+            if self.is_streaming:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(cl.user_session.get("current_msg").update())
+                else:
+                    asyncio.run(cl.user_session.get("current_msg").update())
+                self.is_streaming = False
+        except Exception as e:
+            Logger.error(f"Error finalizing message: {e}")
+
 
 
 class RivalzAgent:
@@ -33,7 +69,7 @@ class RivalzAgent:
     and provides a consistent interface for interaction with these agents.
     """
     
-    def __init__(self, project_id: str, shared_storage: InMemoryChatStorage,callbacks: AgentCallbacks = None):
+    def __init__(self, project_id: str, shared_storage: InMemoryChatStorage):
         """
         Initialize the RivalzAgent with specified project ID and agent types.
         
@@ -51,14 +87,27 @@ class RivalzAgent:
         self.deep_infra_model = os.getenv("deep_infra_model")
         self.rivalz_url = os.getenv("RIVAL_URL", "https://staging-rome-api-v2.rivalz.ai/agent")
         self.project_auth_token = os.getenv("auth_key", project_id)
-        self.callbacks =callbacks
+        self.callbacks =ChainlitAgentCallbacks()
         self.shared_storage = shared_storage
+        self.team_info = {}
         # Initialize storage
-        self._fetch_resource_info()
-            # Default to initializing all types if none specified
-        self._initialize_agent()
+        # Removed calls to _fetch_resource_info and _initialize_agent
 
-    def _fetch_resource_info(self):
+    async def initialize(self):
+        """Initialize the agent asynchronously"""
+        await self._fetch_resource_info()
+        await self._initialize_agent()
+        return self
+
+    @classmethod
+    async def create(cls, project_id, shared_storage):
+        """Factory method to create and initialize RivalzAgent"""
+        agent = cls(project_id, shared_storage)
+        await agent._fetch_resource_info()
+        await agent._initialize_agent()
+        return agent
+
+    async def _fetch_resource_info(self):
         """
         Fetch available agent types from the API and initialize them.
         """
@@ -67,8 +116,8 @@ class RivalzAgent:
             api_url = f"{self.rivalz_url}/agent/swarm"
             Logger.info(f"Fetching team info from API at {api_url}")
             
-            with httpx.AsyncClient(timeout=20) as client:
-                response = client.get(api_url, params=params)
+            async with httpx.AsyncClient(timeout=20) as client:
+                response = await client.get(api_url, params=params)
                 
             if response.status_code != 200:
                 Logger.error(f"Error fetching team info: {response.status_code} - {response.text}")
@@ -89,14 +138,12 @@ class RivalzAgent:
             }
             
         except Exception as e:
-            Logger.error(f"Error fetching team info: {str(e)}")
+
+            Logger.error(f" Error fetching team info: {str(e)}")
             self.team_info = {}    
     
-    def _initialize_agent(self):
-        """
-        Initialize agent types based on available resources in team_info.
-        """
-        
+    async def _initialize_agent(self):
+        """Initialize agent types based on available resources in team_info."""
         if not self.team_info:
             Logger.error("Team info not available. Cannot initialize agents.")
             raise ValueError("Team info not available. Cannot initialize agents.")
@@ -104,7 +151,6 @@ class RivalzAgent:
         self.polling_tasks = {}
         self.polling_active = False
         
-        # Define agent types with their creation methods and resource keys
         agent_configs = {
             'rc': {'attr': 'rc_agent', 'creator': self._create_rc_agent, 'name': 'RC'},
             'rd': {'attr': 'rd_agent', 'creator': self._create_rd_agent, 'name': 'RD'},
@@ -112,26 +158,23 @@ class RivalzAgent:
             'rx': {'attr': 'rx_agent', 'creator': self._create_rx_agent, 'name': 'RX'}
         }
 
-        # Initialize each agent type based on available resources
         for agent_type, config in agent_configs.items():
             try:
                 if self.team_info.get(agent_type, 0) > 0:
-                    # Pass numberagent parameter for RC, RD, RE agents
-                    if agent_type in ['rc', 'rd', 're']:
-                        numberagent = self.team_info.get(agent_type, 0)
-                        setattr(self, config['attr'], config['creator'](numberagent))
+                    if agent_type == 'rx':
+                        # Await the async creation of RX agent
+                        agent = await config['creator']()
                     else:
-                        # RX agent doesn't need numberagent parameter
-                        setattr(self, config['attr'], config['creator']())
+                        # Other agents are synchronous
+                        numberagent = self.team_info.get(agent_type, 0)
+                        agent = config['creator'](numberagent)
+                    setattr(self, config['attr'], agent)
                     Logger.info(f"{config['name']} Agent Initialized with {self.team_info.get(agent_type, 0)} instances")
                 else:
                     setattr(self, config['attr'], None)
             except Exception as e:
                 Logger.error(f"Failed to initialize {config['name']} Agent: {str(e)}")
                 setattr(self, config['attr'], None)
-    
-
-
 
     def _create_rc_agent(self, numberagent) -> RCAgent:
         """Create and configure a Resource Compute (RC) agent"""
@@ -155,6 +198,7 @@ class RivalzAgent:
                 'stopSequences': []
             },
             callbacks=self.callbacks,
+            streaming = False,
         ))
     
     def _create_rd_agent(self, numberagent) -> RDAgent:
@@ -178,6 +222,7 @@ class RivalzAgent:
                 'stopSequences': []
             },
             callbacks=self.callbacks,
+            streaming = False,
         ))
     
     def _create_re_agent(self, numberagent) -> REAgent:
@@ -200,36 +245,46 @@ class RivalzAgent:
                 'temperature': 0.5,
             },
             callbacks=self.callbacks,
+            streaming = False,
         ))
 
-    async def _create_rx_agent(self) -> RXRivalzAgent:
+    async def _create_rx_agent(self):
         """Create and configure an RX Rivalz agent for social media"""
-        # For RX agent, check if we have token info from environment
-        Logger.info("Shared storage initialized")
-        Logger.info("Creating agents...")
-        custom_classifier = create_classifier()
-        default_agent = create_default_agent()
-        # Add await keyword to call the async function properly
-        rx_supervisor =  asyncio.run(create_rx_supervisor(storage = self.shared_storage, project_id=self.project_id))
-        # Initialize orchestrator
-        Logger.info("Initializing orchestrator")
-        orchestrator = SwarmOrchestrator(options=OrchestratorConfig(
-                LOG_AGENT_CHAT=True,
-                LOG_CLASSIFIER_CHAT=True,
-                LOG_CLASSIFIER_RAW_OUTPUT=True,
-                LOG_CLASSIFIER_OUTPUT=True,
-                LOG_EXECUTION_TIMES=True,
-                MAX_RETRIES=3,
-                USE_DEFAULT_AGENT_IF_NONE_IDENTIFIED=True,
-                MAX_MESSAGE_PAIRS_PER_AGENT=10
-            ),
-            classifier=custom_classifier,
-            default_agent=default_agent,
-            storage=self.shared_storage,
-        )
-        orchestrator.add_agent(rx_supervisor)
-        Logger.info(f"Creating orchestrator with project_id: {self.project_id}")
-        return orchestrator
+        try:
+            Logger.info("Creating RX agent...")
+            custom_classifier = create_classifier()
+            default_agent = create_default_agent()
+            
+            # Await the rx_supervisor creation
+            rx_supervisor = await create_rx_supervisor(
+                storage=self.shared_storage,
+                project_id=self.project_id
+            )
+            
+            orchestrator = SwarmOrchestrator(
+                options=OrchestratorConfig(
+                    LOG_AGENT_CHAT=True,
+                    LOG_CLASSIFIER_CHAT=True,
+                    LOG_CLASSIFIER_RAW_OUTPUT=True,
+                    LOG_CLASSIFIER_OUTPUT=True,
+                    LOG_EXECUTION_TIMES=True,
+                    MAX_RETRIES=3,
+                    USE_DEFAULT_AGENT_IF_NONE_IDENTIFIED=True,
+                    MAX_MESSAGE_PAIRS_PER_AGENT=10
+                ),
+                classifier=custom_classifier,
+                default_agent=default_agent,
+                storage=self.shared_storage,
+            )
+            
+            # Add the supervisor to the orchestrator
+            orchestrator.add_agent(rx_supervisor)
+            Logger.info(f"Created orchestrator with project_id: {self.project_id}")
+            return orchestrator
+            
+        except Exception as e:
+            Logger.error(f"Error creating RX agent: {str(e)}")
+            raise
     
     
     def _get_agent_by_type(self, agent_type: str) -> Optional[Agent]:
@@ -245,4 +300,90 @@ class RivalzAgent:
             return self.rx_agent
         return None
     
+    def generate_start_message(self) -> str:
+        """Generate initial message showing available team resources."""
+        if not self.team_info:
+            return "Team information not available. Please try again later."
+        
+        message = "You are interacting with the following team resources:\n"
+        
+        # Add resource counts
+        resource_names = {
+            'rx': 'RX (Social Media) Agents',
+            'rc': 'RC (Compute) Agents',
+            'rd': 'RD (Data) Agents',
+            're': 'RE (Execution) Agents'
+        }
+        
+        for resource_key, display_name in resource_names.items():
+            count = self.team_info.get(resource_key, 0)
+            if count > 0:
+                message += f"- {display_name}: {count}\n"
+        
+        # Add swarm information if available
+        info = self.team_info.get('info', {})
+        if info:
+            swarm_level = info.get('swarm_level', 'Unknown')
+            message += f"\nSwarm Level: {swarm_level}\n"
+            
+            # Add any additional team info that might be useful
+            total_resources = self.team_info.get('total_resources', 0)
+            if total_resources:
+                message += f"Total Resources: {total_resources}\n"
+                
+        # Add last updated timestamp
+        last_updated = self.team_info.get('last_updated')
+        if last_updated:
+            message += f"\nLast Updated: {last_updated.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        
+        return message
     
+
+    async def process_request(self, input_text:str,
+        user_id:str,
+        session_id:str,
+        chat_history:list=[],
+        additional_params:dict= {},
+        agent_type:str='rx') -> str:
+        """Process a message using the specified agent type"""
+         
+        """Get agent instance by type"""
+        agent_type = agent_type.lower()
+        if agent_type == "rc":
+            response: ConversationMessage = await self.rc_agent.process_request(input_text= input_text, user_id=user_id, session_id=session_id, chat_history=chat_history, additional_params=additional_params)
+            metadata = self.create_metadata(self.rc_agent, input_text, user_id, session_id, additional_params)
+            return AgentResponse(metadata, response, self.rc_agent.is_streaming_enabled())
+        elif agent_type == "rd":
+            response: ConversationMessage = await self.rd_agent.process_request(input_text= input_text, user_id=user_id, session_id=session_id, chat_history=chat_history, additional_params=additional_params)
+            metadata = self.create_metadata(self.rd_agent, input_text, user_id, session_id, additional_params)
+            return AgentResponse(metadata, response, self.rd_agent.is_streaming_enabled())
+        elif agent_type == "re": # Added REAgent
+            response: ConversationMessage = await self.re_agent.process_request(input_text= input_text, user_id=user_id, session_id=session_id, chat_history=chat_history, additional_params=additional_params)
+            metadata = self.create_metadata(self.re_agent, input_text, user_id, session_id, additional_params)
+            return AgentResponse(metadata, response, self.re_agent.is_streaming_enabled())
+        elif agent_type == "rx":
+            response: AgentResponse = await self.rx_agent.route_request(user_input= input_text, user_id=user_id, session_id=session_id, chat_history=chat_history, additional_params=additional_params)
+            return response
+        return None
+    
+    
+    def create_metadata(self,
+                        selected_agent: Agent,
+                        user_input: str,
+                        user_id: str,
+                        session_id: str,
+                        additional_params: Dict[str, str]) -> AgentProcessingResult:
+        base_metadata = AgentProcessingResult(
+            user_input=user_input,
+            agent_id="no_agent_selected",
+            agent_name="No Agent",
+            user_id=user_id,
+            session_id=session_id,
+            additional_params=additional_params
+        )
+ 
+        base_metadata.agent_id = selected_agent.id
+        base_metadata.agent_name = selected_agent.name
+
+        return base_metadata
+

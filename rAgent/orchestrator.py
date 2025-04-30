@@ -1,4 +1,4 @@
-from typing import Dict, Any, AsyncIterable, Optional, Union
+from typing import Dict, Any, AsyncIterable, Optional, Union, List
 from dataclasses import dataclass, fields, asdict, replace
 import time
 from rAgent.utils.logger import Logger
@@ -78,6 +78,7 @@ class SwarmOrchestrator:
         user_id = params['user_id']
         session_id = params['session_id']
         classifier_result:ClassifierResult = params['classifier_result']
+        chat_history = params.get('chat_history', [])
         additional_params = params.get('additional_params', {})
         if not classifier_result.selected_agent:
             return "I'm sorry, but I need more information to understand your request. \
@@ -86,8 +87,12 @@ class SwarmOrchestrator:
         selected_agent = classifier_result.selected_agent
         agent_chat_history = await self.storage.fetch_chat(user_id, session_id, selected_agent.id)
         if selected_agent.share_global_memory:
-            agent_chat_history = await self.storage.fetch_all_chats(user_id, session_id)
-            additional_params['global_history'] = agent_chat_history
+            if chat_history:
+                agent_chat_history = chat_history
+                additional_params['global_history'] = agent_chat_history
+            else:
+                agent_chat_history = await self.storage.fetch_all_chats(user_id, session_id)
+                additional_params['global_history'] = agent_chat_history
         self.logger.print_chat_history(agent_chat_history, selected_agent.id)
 
         response = await self.measure_execution_time(
@@ -132,6 +137,7 @@ class SwarmOrchestrator:
                                user_id: str,
                                session_id: str,
                                classifier_result: ClassifierResult,
+                               chat_history: Optional[list[ConversationMessage]] = None,
                                additional_params: Dict[str, str] = {}) -> AgentResponse:
         """Process agent response and handle chat storage."""
         try:
@@ -140,6 +146,7 @@ class SwarmOrchestrator:
                 "user_id": user_id,
                 "session_id": session_id,
                 "classifier_result": classifier_result,
+                "chat_history": chat_history,
                 "additional_params": additional_params
             })
 
@@ -178,7 +185,8 @@ class SwarmOrchestrator:
     async def route_request(self,
                        user_input: str,
                        user_id: str,
-                       session_id: str, 
+                       session_id: str,
+                       chat_history: Optional[list[ConversationMessage]] = None, 
                        additional_params: Dict[str, str] = {}) -> AgentResponse:
         """Route user request to appropriate agent."""
         self.execution_times.clear()
@@ -198,8 +206,9 @@ class SwarmOrchestrator:
             responses = await self.agent_process_request(
                 user_input, 
                 user_id,
-                session_id, 
+                session_id,
                 classifier_result,
+                chat_history, 
                 additional_params
             )
             return responses

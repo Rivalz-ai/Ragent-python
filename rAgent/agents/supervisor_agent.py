@@ -397,6 +397,7 @@ When communicating with other agents, including the User, please follow these gu
                             content=[{"text": f"You must provide the number of agents and topic/content to process jobs {task}!"}]
                         )
                     )
+
                     return await self.lead_agent.process_request(
                     input_text, user_id, session_id, chat_history, additional_params
                 )

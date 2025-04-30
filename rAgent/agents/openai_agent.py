@@ -112,6 +112,7 @@ class OpenAIAgent(Agent):
             system_prompt = self.system_prompt
 
             global_history = []
+            
             if additional_params and 'team_info' in additional_params:
                 team_info = additional_params['team_info']
             if self.share_global_memory and additional_params and 'global_history' in additional_params:
@@ -124,10 +125,10 @@ class OpenAIAgent(Agent):
             if global_history:
                 global_context= "\n\nGLOBAL CONVERSATION CONTEXT OF USER WITH MANY AGENT:\n"
                 for i, msg in enumerate(global_history):
-                            if i >= 10:  # Limit to last 10 messages to avoid token limits
-                                break
-                            content = msg.content[0].get('text', '') if msg.content else ''
-                            global_context += f"{msg.role}: {content}\n"
+                    if i >= 10:  # Limit to last 10 messages to avoid token limits
+                        break
+                    content = msg.content[0].get('text', '') if msg.content else ''
+                    global_context += f"{msg.role}: {content}\n"
                 system_prompt += global_context
             if team_info:
                 system_prompt += f"\n\nTEAM CONTEXT:\n{team_info}"

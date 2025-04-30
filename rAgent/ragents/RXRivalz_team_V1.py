@@ -338,6 +338,8 @@ class RXTeamSupervisorRivalz(SupervisorAgent):
         - I recommend safer alternatives when risky commands are requested
         - I can help diagnose system issues and suggest solutions
         - If the responses from the tools have the ID information (e.g., job_id), please show them to the users.
+        - If you are ask can post to X, please answer yes, and guild user post by enter:  content and number of agents.
+
         
         ## Response Format
         - I provide concise, accurate information about system status

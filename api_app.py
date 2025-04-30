@@ -54,7 +54,7 @@ async def custom_auth(request: Request):
         return {"error": str(e)}
 
 # Mount Chainlit application
-mount_chainlit(app=app, target="rivalz_multiRX.py", path="/chat")
+mount_chainlit(app=app, target="rivalz_orchestration.py", path="/chat")
 
 # Serve static files from the "public" directory
 app.mount("/public", StaticFiles(directory="public"), name="public")
