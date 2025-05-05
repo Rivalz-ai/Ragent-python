@@ -54,7 +54,7 @@ async def custom_auth(request: Request):
         return {"error": str(e)}
 
 # Mount Chainlit application
-mount_chainlit(app=app, target="rivalz_orchestration.py", path="/chat")
+mount_chainlit(app=app, target="rivalz_multiRX.py", path="/chat")
 
 # Serve static files from the "public" directory
 app.mount("/public", StaticFiles(directory="public"), name="public")
@@ -67,21 +67,21 @@ from chainlit.user import User
 from chainlit.utils import mount_chainlit
 from chainlit.server import _authenticate_user
 from rAgent.utils import Logger
-@app.get("/custom-auth")
-async def custom_auth(request: Request):
-    try:
-        Logger.info("Starting custom authentication")
-        project_id = "67b465519870d36dd0fd9818"
-        project_name = "Qualoo"
-        payload = {'project_id': project_id, 'project_name': project_name}
-        user = User(identifier=project_name, metadata=payload)
-        Logger.info(f"User created: {user}")
-        response = await _authenticate_user(request, user)
-        Logger.info("Authentication successful")
-        return response
-    except Exception as e:
-        Logger.error(f"Error in custom_auth: {e}")
-        return {"error": str(e)}
+# @app.get("/custom-auth")
+# async def custom_auth(request: Request):
+#     try:
+#         Logger.info("Starting custom authentication")
+#         project_id = "67b465519870d36dd0fd9818"
+#         project_name = "Qualoo"
+#         payload = {'project_id': project_id, 'project_name': project_name}
+#         user = User(identifier=project_name, metadata=payload)
+#         Logger.info(f"User created: {user}")
+#         response = await _authenticate_user(request, user)
+#         Logger.info("Authentication successful")
+#         return response
+#     except Exception as e:
+#         Logger.error(f"Error in custom_auth: {e}")
+#         return {"error": str(e)}
 
 async def get_projects(authen_key: str, page: int = 1, page_size: int = 10) -> Dict:
     """

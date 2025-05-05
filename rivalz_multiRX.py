@@ -255,6 +255,13 @@ async def on_chat_resume(thread: ThreadDict):
 
     global polling_active
     polling_active = True
+
+    history = cl.user_session.get("chat_history", [])
+    print(f"History: {history}")
+    if len(history) > 0:
+        team_info  =history[0].get("content", "No have team information")
+    else:
+        team_info = "No have team information"
     Logger.warn(f"continues with { thread['id']}")
     asyncio.create_task(update_task_stats(thread['id'], project_id))
     Logger.info("Started background task for updating task statistics")
@@ -362,6 +369,7 @@ async def main(message: cl.Message):
     project_id = cl.user_session.get("project_id")
     history = cl.user_session.get("chat_history", [])
     print(f"History: {history}")
+    _history = [ConversationMessage(role=msg["role"], content=[{'text':msg["content"]}]) for msg in history]
     if len(history) > 0:
         team_info  =history[0].get("content", "No have team information")
     else:
@@ -380,7 +388,7 @@ async def main(message: cl.Message):
     cl.user_session.set("current_msg", msg)
     try:
         Logger.debug(f"Team info: {team_info}")
-        response: AgentResponse = await orchestrator.route_request(message.content, user_id, thread_id, {"team_info": team_info})
+        response: AgentResponse = await orchestrator.route_request(message.content, user_id, thread_id, _history,{"team_info": team_info})
         Logger.info(f"Received response from orchestrator for user: {user_id} is: {response.output.content[0].get('text', '')}")
         
 
